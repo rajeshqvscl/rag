@@ -20,19 +20,13 @@
             <div class="nav-item active" onclick="showSection('analysis')">
                 <i data-lucide="layout-dashboard"></i> Revert Analysis
             </div>
-            <div class="nav-item" onclick="showSection('intel')">
-                <i data-lucide="search"></i> Intelligence Cloud
-            </div>
-            <div class="nav-item" onclick="showSection('portfolio')">
-                <i data-lucide="bar-chart-3"></i> Portfolio Benchmarks
+                        <div class="nav-item" onclick="showSection('drafts')">
+                <i data-lucide="file-text"></i> Drafts
             </div>
             <div class="nav-item" onclick="showSection('library')">
                 <i data-lucide="library"></i> Pitch Deck Library
             </div>
-            <div class="nav-item" onclick="showSection('compliance')">
-                <i data-lucide="shield-check"></i> Compliance & ESG
-            </div>
-            <div class="nav-item" onclick="showSection('integrations')">
+                                    <div class="nav-item" onclick="showSection('integrations')">
                 <i data-lucide="link"></i> Integrations
             </div>
             <div class="nav-item" style="margin-top: auto;" onclick="showSection('settings')">
@@ -50,14 +44,30 @@
             </div>
             <div style="display: flex; gap: 1rem; align-items: center;">
                 <div id="status-indicator" class="badge badge-success">Online</div>
-                <img src="https://ui-avatars.com/api/?name=Analyst+AI&background=6366f1&color=fff" style="border-radius: 50%; width: 40px;">
+                <div class="user-menu" style="position: relative;">
+                    <div id="user-avatar" style="cursor: pointer;" onclick="toggleUserMenu()">
+                        <img src="https://ui-avatars.com/api/?name=User&background=6366f1&color=fff" style="border-radius: 50%; width: 40px;">
+                    </div>
+                    <div id="user-dropdown" style="display: none; position: absolute; right: 0; top: 50px; background: #1e1e2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.5rem 0; min-width: 180px; z-index: 1000; box-shadow: 0 10px 40px rgba(0,0,0,0.4);">
+                        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                            <div id="user-name" style="font-weight: 600; font-size: 0.9rem;">User</div>
+                            <div id="user-email" style="font-size: 0.75rem; color: var(--text-muted);">user@example.com</div>
+                        </div>
+                        <a href="#" onclick="showSection('settings'); toggleUserMenu(); return false;" style="display: block; padding: 0.6rem 1rem; color: var(--text); text-decoration: none; font-size: 0.85rem; transition: background 0.2s;">
+                            <i data-lucide="settings" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></i> Settings
+                        </a>
+                        <a href="#" onclick="logout(); return false;" style="display: block; padding: 0.6rem 1rem; color: #ef4444; text-decoration: none; font-size: 0.85rem; transition: background 0.2s; border-top: 1px solid rgba(255,255,255,0.1);">
+                            <i data-lucide="log-out" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></i> Sign Out
+                        </a>
+                    </div>
+                </div>
             </div>
         </header>
 
         <section id="analysis-section">
             <div class="grid">
                 <!-- Data Upload -->
-                <div class="card" style="grid-column: span 2;">
+                <div class="card">
                     <div class="card-title">Inbound Revert Processor <i data-lucide="upload-cloud"></i></div>
                     <div id="dropzone" class="dropzone">
                         <i data-lucide="file-plus" style="width: 40px; height: 40px; color: var(--primary);"></i>
@@ -78,17 +88,22 @@
                 </div>
 
                 <!-- Analysis Report -->
-                <div class="card" style="grid-column: span 2;">
+                <div class="card">
                     <div class="card-title">Analyst Deep-Dive <i data-lucide="file-text"></i></div>
                     <div id="analysis-markdown" class="analysis-report">
-                        <div style="height: 300px; display: flex; align-items: center; justify-content: center; color: #333;">
+                        <div style="min-height: 100px; display: flex; align-items: center; justify-content: center; color: #333;">
                            Report will populate here...
                         </div>
+                    </div>
+                    <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+                        <button onclick="exportAnalysis()" class="nav-item" style="flex:1; background: var(--primary); color: white; border: none; justify-content: center;">
+                            <i data-lucide="download" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Export Analysis
+                        </button>
                     </div>
                 </div>
 
                 <!-- Charts -->
-                <div class="card" style="grid-column: span 1;">
+                <div class="card">
                     <div class="card-title">Extracted Growth Trend <i data-lucide="line-chart"></i></div>
                     <canvas id="revenueChart" style="max-height: 250px;"></canvas>
                 </div>
@@ -100,71 +115,136 @@
                         Select a revert to view draft.
                     </div>
                     <div style="margin-top: 1rem; display: flex; gap: 1rem;">
-                        <button class="nav-item" style="flex:1; background: #222; border:none;">Copy</button>
+                        <button onclick="copyEmail()" class="nav-item" style="flex:1; background: #222; border:none;">Copy</button>
+                        <button onclick="exportEmail()" class="nav-item" style="flex:1; background: var(--secondary); color:white; border:none;">
+                            <i data-lucide="download" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Export
+                        </button>
                         <button class="nav-item" style="flex:1; background: var(--secondary); color:white; border:none;">Push to Hubspot</button>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Intelligence Cloud Section -->
-        <section id="intel-section" style="display: none;">
-             <div class="grid">
-                 <div class="card" style="grid-column: span 2;">
-                     <div class="card-title">Global Brain Visualization <i data-lucide="network"></i></div>
-                     <div id="search-results">
-                         <p style="color: var(--text-muted);">Use the search bar above to query RAG memory.</p>
-                     </div>
-                 </div>
-                 <div class="card">
-                     <div class="card-title">Market Ingest <i data-lucide="database"></i></div>
-                     <input type="text" id="ingest-ticker" class="search-input" placeholder="Enter Ticker (e.g. MSFT)" style="border: 1px solid var(--border); margin-bottom: 1rem;">
-                     <button onclick="ingestMarketData()" class="nav-item" style="width: 100%; background: var(--secondary); color: white; border: none;">Ingest SEC/Market Data</button>
-                     <div id="ingest-status" style="margin-top: 1rem; font-size: 0.8rem;"></div>
-                 </div>
-             </div>
-        </section>
-
-        <!-- Portfolio Benchmarks Section -->
-        <section id="portfolio-section" style="display: none;">
-            <div class="grid">
-                <div class="card">
-                    <div class="card-title">Portfolio High Water Mark <i data-lucide="trending-up"></i></div>
-                    <h2 style="font-size: 2.5rem;">$4.2M <span style="font-size: 1rem; color: var(--accent-success);">+12%</span></h2>
-                    <p style="color: var(--text-muted);">Avg. ARR per Target</p>
-                </div>
-                <div class="card">
-                    <div class="card-title">Expense Distribution <i data-lucide="pie-chart"></i></div>
-                    <canvas id="benchChart"></canvas>
-                </div>
-            </div>
-        </section>
-
-        <!-- Compliance Section -->
-        <section id="compliance-section" style="display: none;">
+        
+        <!-- Drafts Section -->
+        <section id="drafts-section" style="display: none;">
             <div class="card">
-                <div class="card-title">ESG Guardrails <i data-lucide="leaf"></i></div>
-                <div style="padding: 1rem; background: rgba(16, 185, 129, 0.1); border-radius: 12px; border-left: 4px solid var(--accent-success);">
-                    <strong>Carbon Footprint Impact:</strong> Low (Tier A+)
-                </div>
-                <div style="padding: 1rem; background: rgba(245, 158, 11, 0.1); border-radius: 12px; border-left: 4px solid var(--accent-warning); margin-top: 1rem;">
-                    <strong>Mandate Check:</strong> Warning - Related party transactions detected.
+                <div class="card-title">Pitch Deck Analysis Drafts <i data-lucide="file-text"></i></div>
+                <div style="padding: 1rem;">
+                    <p style="color: var(--text-muted); margin-bottom: 1rem;">View and manage your pitch deck analysis drafts here.</p>
+                    <div id="drafts-list" style="display: grid; gap: 1rem;">
+                        <!-- Drafts will be loaded here -->
+                    </div>
                 </div>
             </div>
         </section>
 
+        
         <!-- Integrations Section -->
         <section id="integrations-section" style="display: none;">
-             <div class="grid">
-                <div class="card"><h3>Hubspot</h3><button class="badge badge-success">Connected</button></div>
-                <div class="card"><h3>Salesforce</h3><button class="badge badge-success">Connected</button></div>
-                <div class="card"><h3>Slack</h3><button class="badge badge-risk" style="background: transparent;">Disconnected</button></div>
-             </div>
+            <div class="card" style="margin-bottom: 1rem;">
+                <div class="card-title">Connected Platforms <i data-lucide="link"></i></div>
+                <p style="color: var(--text-muted); margin-top: 0.5rem;">Manage your external platform connections</p>
+            </div>
+            <div class="grid" id="integrations-grid">
+                <!-- HubSpot -->
+                <div class="card integration-card" data-integration="hubspot">
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <div style="width: 48px; height: 48px; background: #ff7a59; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">H</div>
+                        <div>
+                            <h3 style="margin: 0;">HubSpot</h3>
+                            <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">CRM & Marketing</p>
+                        </div>
+                    </div>
+                    <div class="integration-status" style="margin-bottom: 1rem;">
+                        <span class="badge badge-risk" style="background: transparent;">Disconnected</span>
+                    </div>
+                    <button class="nav-item connect-btn" style="width: 100%; justify-content: center; background: var(--primary); color: white; border: none;" onclick="showConnectModal('hubspot')">Connect</button>
+                    <button class="nav-item disconnect-btn" style="width: 100%; justify-content: center; background: #dc2626; color: white; border: none; display: none;" onclick="disconnectIntegration('hubspot')">Disconnect</button>
+                </div>
+
+                <!-- Salesforce -->
+                <div class="card integration-card" data-integration="salesforce">
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <div style="width: 48px; height: 48px; background: #00a1e0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">S</div>
+                        <div>
+                            <h3 style="margin: 0;">Salesforce</h3>
+                            <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">Enterprise CRM</p>
+                        </div>
+                    </div>
+                    <div class="integration-status" style="margin-bottom: 1rem;">
+                        <span class="badge badge-risk" style="background: transparent;">Disconnected</span>
+                    </div>
+                    <button class="nav-item connect-btn" style="width: 100%; justify-content: center; background: var(--primary); color: white; border: none;" onclick="showConnectModal('salesforce')">Connect</button>
+                    <button class="nav-item disconnect-btn" style="width: 100%; justify-content: center; background: #dc2626; color: white; border: none; display: none;" onclick="disconnectIntegration('salesforce')">Disconnect</button>
+                </div>
+
+                <!-- Slack -->
+                <div class="card integration-card" data-integration="slack">
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <div style="width: 48px; height: 48px; background: #4a154b; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">S</div>
+                        <div>
+                            <h3 style="margin: 0;">Slack</h3>
+                            <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">Team Messaging</p>
+                        </div>
+                    </div>
+                    <div class="integration-status" style="margin-bottom: 1rem;">
+                        <span class="badge badge-risk" style="background: transparent;">Disconnected</span>
+                    </div>
+                    <button class="nav-item connect-btn" style="width: 100%; justify-content: center; background: var(--primary); color: white; border: none;" onclick="showConnectModal('slack')">Connect</button>
+                    <button class="nav-item disconnect-btn" style="width: 100%; justify-content: center; background: #dc2626; color: white; border: none; display: none;" onclick="disconnectIntegration('slack')">Disconnect</button>
+                </div>
+
+                <!-- Gmail -->
+                <div class="card integration-card" data-integration="gmail">
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <div style="width: 48px; height: 48px; background: #ea4335; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">G</div>
+                        <div>
+                            <h3 style="margin: 0;">Gmail</h3>
+                            <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">Email Integration</p>
+                        </div>
+                    </div>
+                    <div class="integration-status" style="margin-bottom: 1rem;">
+                        <span class="badge badge-risk" style="background: transparent;">Disconnected</span>
+                    </div>
+                    <button class="nav-item connect-btn" style="width: 100%; justify-content: center; background: var(--primary); color: white; border: none;" onclick="showConnectModal('gmail')">Connect</button>
+                    <button class="nav-item disconnect-btn" style="width: 100%; justify-content: center; background: #dc2626; color: white; border: none; display: none;" onclick="disconnectIntegration('gmail')">Disconnect</button>
+                </div>
+
+                <!-- GitHub -->
+                <div class="card integration-card" data-integration="github">
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <div style="width: 48px; height: 48px; background: #333; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">GH</div>
+                        <div>
+                            <h3 style="margin: 0;">GitHub</h3>
+                            <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">Code Repository</p>
+                        </div>
+                    </div>
+                    <div class="integration-status" style="margin-bottom: 1rem;">
+                        <span class="badge badge-risk" style="background: transparent;">Disconnected</span>
+                    </div>
+                    <button class="nav-item connect-btn" style="width: 100%; justify-content: center; background: var(--primary); color: white; border: none;" onclick="showConnectModal('github')">Connect</button>
+                    <button class="nav-item disconnect-btn" style="width: 100%; justify-content: center; background: #dc2626; color: white; border: none; display: none;" onclick="disconnectIntegration('github')">Disconnect</button>
+                </div>
+            </div>
+
+            <!-- Connection Modal -->
+            <div id="connect-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;">
+                <div style="background: var(--bg); padding: 2rem; border-radius: 12px; max-width: 500px; width: 90%; border: 1px solid var(--border);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h2 id="connect-modal-title" style="margin: 0;">Connect</h2>
+                        <button onclick="closeConnectModal()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.5rem;">&times;</button>
+                    </div>
+                    <div id="connect-modal-content">
+                        <!-- Dynamic content -->
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- Pitch Library Section -->
         <section id="library-section" style="display: none;">
-            <div class="card" style="grid-column: span 3;">
+            <div class="card">
                 <div class="card-title">Deal Archive <i data-lucide="archive"></i></div>
                 <div id="library-list">
                     <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
@@ -184,6 +264,7 @@
             </div>
         </section>
 
+        
         <!-- Settings Section -->
         <section id="settings-section" style="display: none;">
             <div class="grid">
@@ -203,16 +284,6 @@
                             </select>
                         </div>
                         <button class="nav-item" style="background: var(--primary); color: white; border: none; justify-content: center;">Save Platform State</button>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">System Watchlist <i data-lucide="eye"></i></div>
-                    <div id="settings-watchlist" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem;">
-                        <!-- Symbols -->
-                    </div>
-                    <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
-                        <input type="text" id="add-watchlist" placeholder="AAPL" style="flex: 1; background: #111; border: 1px solid var(--border); padding: 0.5rem; border-radius: 8px; color: white;">
-                        <button onclick="addSymbol()" class="badge badge-success" style="border: none;">Add</button>
                     </div>
                 </div>
             </div>

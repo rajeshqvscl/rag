@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - FinRAG</title>
+    <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Exo 2', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: radial-gradient(circle at 75% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                        radial-gradient(circle at 20% 80%, rgba(236, 72, 153, 0.1) 0%, transparent 40%),
+                        #050711;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #f8fafc;
+        }
+
+        .login-container {
+            background: rgba(21, 23, 30, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 420px;
+            padding: 48px;
+        }
+
+        .logo-section {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #04659e9d 0%, #764ba2 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .logo-text {
+            font-size: 28px;
+            font-weight: 700;
+            color: #f8fafc;
+        }
+
+        .tagline {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #f8fafc;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            font-size: 14px;
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #94a3b8;
+            margin-bottom: 6px;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            width: 20px;
+            height: 20px;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 14px 12px 44px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            font-size: 15px;
+            transition: all 0.2s;
+            background: rgba(10, 11, 16, 0.6);
+            color: #f8fafc;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #034453;
+            background: rgba(10, 11, 16, 0.8);
+        }
+
+        input::placeholder {
+            color: #64748b;
+        }
+
+        .error-message {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #034453 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(0, 210, 255, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-primary .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        .btn-primary.loading .spinner {
+            display: block;
+        }
+
+        .btn-primary.loading .btn-text {
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 24px 0;
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .divider span {
+            padding: 0 16px;
+        }
+
+        .btn-google {
+            width: 100%;
+            padding: 14px;
+            background: rgba(10, 11, 16, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 500;
+            color: #f8fafc;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .btn-google:hover {
+            background: rgba(10, 11, 16, 0.8);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-google img {
+            width: 20px;
+            height: 20px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .footer-text {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        .footer-link {
+            color: #00d2ff;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .footer-link:hover {
+            text-decoration: underline;
+        }
+
+        .forgot-password {
+            text-align: right;
+            margin-top: -12px;
+            margin-bottom: 20px;
+        }
+
+        .forgot-password a {
+            color: #00d2ff;
+            font-size: 13px;
+            text-decoration: none;
+        }
+
+        .forgot-password a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo-section">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i data-lucide="rocket"></i>
+                </div>
+                <span class="logo-text">FinRAG</span>
+            </div>
+            <p class="tagline">Venture Intelligence Platform</p>
+        </div>
+
+        <h1>Welcome back</h1>
+        <p class="subtitle">Sign in to access your dashboard</p>
+
+        <div id="error-message" class="error-message"></div>
+
+        <form id="login-form">
+            <div class="form-group">
+                <label for="username">Username or Email</label>
+                <div class="input-wrapper">
+                    <i data-lucide="user"></i>
+                    <input type="text" id="username" name="username" placeholder="Enter your username" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <div class="input-wrapper">
+                    <i data-lucide="lock"></i>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                </div>
+            </div>
+
+            <div class="forgot-password">
+                <a href="#" onclick="showForgotPassword()">Forgot password?</a>
+            </div>
+
+            <button type="submit" class="btn-primary" id="login-btn">
+                <div class="spinner"></div>
+                <span class="btn-text">Sign In</span>
+            </button>
+        </form>
+
+        <div class="divider">
+            <span>or continue with</span>
+        </div>
+
+        <button class="btn-google" onclick="loginWithGoogle()">
+            <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google">
+            Sign in with Google
+        </button>
+
+        <div class="footer">
+            <p class="footer-text">
+                Don't have an account? 
+                <a href="register.html" class="footer-link">Sign up</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        const API_URL = 'http://localhost:9000';
+
+        // Check if already logged in
+        function checkAuth() {
+            const token = localStorage.getItem('access_token');
+            if (token) {
+                window.location.href = 'index.html';
+            }
+        }
+        checkAuth();
+
+        // Handle login form submission
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('login-btn');
+            const errorDiv = document.getElementById('error-message');
+            
+            // Show loading state
+            btn.classList.add('loading');
+            btn.disabled = true;
+            errorDiv.classList.remove('show');
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Store tokens
+                    localStorage.setItem('access_token', data.access_token);
+                    localStorage.setItem('refresh_token', data.refresh_token);
+                    localStorage.setItem('token_type', data.token_type);
+                    
+                    // Store user info
+                    if (data.user) {
+                        localStorage.setItem('user', JSON.stringify(data.user));
+                    }
+                    
+                    // Redirect to main app
+                    window.location.href = 'index.html';
+                } else {
+                    errorDiv.textContent = data.detail || 'Invalid username or password';
+                    errorDiv.classList.add('show');
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Network error. Please check your connection.';
+                errorDiv.classList.add('show');
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            }
+        });
+
+        // Handle Google login
+        async function loginWithGoogle() {
+            const btn = document.querySelector('.btn-google');
+            btn.disabled = true;
+            btn.style.opacity = '0.7';
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/google/login`);
+                const data = await response.json();
+                
+                if (response.ok && data.authorization_url) {
+                    // Redirect to Google OAuth
+                    window.location.href = data.authorization_url;
+                } else {
+                    const errorDiv = document.getElementById('error-message');
+                    errorDiv.textContent = data.detail || 'Google login is not configured. Please contact administrator.';
+                    errorDiv.classList.add('show');
+                }
+            } catch (error) {
+                const errorDiv = document.getElementById('error-message');
+                errorDiv.textContent = 'Network error. Please check your connection.';
+                errorDiv.classList.add('show');
+            } finally {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        }
+
+        // Handle forgot password
+        function showForgotPassword() {
+            const email = prompt('Enter your email address:');
+            if (email) {
+                // In a real app, this would call the reset password API
+                alert('Password reset link would be sent to: ' + email);
+            }
+        }
+
+        // Handle Google OAuth callback
+        async function handleGoogleCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const error = urlParams.get('error');
+            
+            if (error) {
+                const errorDiv = document.getElementById('error-message');
+                errorDiv.textContent = 'Google authentication failed. Please try again.';
+                errorDiv.classList.add('show');
+                return;
+            }
+            
+            if (code) {
+                try {
+                    const response = await fetch(`${API_URL}/auth/google/callback?code=${code}`);
+                    const data = await response.json();
+                    
+                    if (response.ok && data.status === 'success') {
+                        // Store tokens
+                        localStorage.setItem('access_token', data.access_token);
+                        localStorage.setItem('refresh_token', data.refresh_token);
+                        localStorage.setItem('token_type', data.token_type);
+                        
+                        // Store user info
+                        if (data.user) {
+                            localStorage.setItem('user', JSON.stringify(data.user));
+                        }
+                        
+                        // Redirect to main app
+                        window.location.href = 'index.html';
+                    } else {
+                        const errorDiv = document.getElementById('error-message');
+                        errorDiv.textContent = data.detail || 'Google login failed. Please try again.';
+                        errorDiv.classList.add('show');
+                    }
+                } catch (error) {
+                    const errorDiv = document.getElementById('error-message');
+                    errorDiv.textContent = 'Network error. Please check your connection.';
+                    errorDiv.classList.add('show');
+                }
+            }
+        }
+
+        // Check for Google callback on page load
+        handleGoogleCallback();
+    </script>
+</body>
+</html>

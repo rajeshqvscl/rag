@@ -89,7 +89,7 @@ class ProjectionService:
         """
 
         response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model=os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20240620"),
             max_tokens=1000,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -115,8 +115,8 @@ class ProjectionService:
         # Limit to last N projections to keep it manageable
         all_projections[symbol] = all_projections[symbol][-50:]
 
-        with open(PROJECTIONS_FILE, "wb") as f:
-            f.write(json.dumps(all_projections, indent=2).encode('utf-8'))
+        with open(PROJECTIONS_FILE, "w", encoding="utf-8") as f:
+            json.dump(all_projections, f, indent=2)
 
     def get_projections(self, symbol: str) -> List[Dict]:
         if not os.path.exists(PROJECTIONS_FILE):

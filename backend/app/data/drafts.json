@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "company": "Test Company",
+    "date": "2026-04-11",
+    "status": "Test",
+    "confidence": "High",
+    "analysis": "Test analysis content",
+    "email_draft": "Test email draft",
+    "revenue_data": [],
+    "files": [
+      {
+        "name": "test.pdf",
+        "type": "test"
+      }
+    ]
+  }
+]

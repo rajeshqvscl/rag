@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth Callback - FinRAG</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Exo 2', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .callback-container {
+            text-align: center;
+            padding: 3rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 2rem;
+        }
+        
+        .status-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+        }
+        
+        .status-icon.loading {
+            background: rgba(99, 102, 241, 0.2);
+            color: #6366f1;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-icon.success {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+        
+        .status-icon.error {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(0.95); }
+        }
+        
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        
+        p {
+            color: #9ca3af;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+        
+        .integration-name {
+            color: #6366f1;
+            font-weight: 600;
+        }
+        
+        .details {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            text-align: left;
+            overflow-x: auto;
+        }
+        
+        .details code {
+            color: #10b981;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            margin-left: 0.5rem;
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .error-details {
+            color: #ef4444;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(99, 102, 241, 0.3);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;800&family=Orbitron:wght@400;600;800&family=Fira+Code&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="callback-container">
+        <div class="logo">FinRAG</div>
+        
+        <div id="loading-state">
+            <div class="status-icon loading">⏳</div>
+            <h2>Connecting...</h2>
+            <div class="spinner"></div>
+            <p>Processing OAuth callback for <span id="integration-name" class="integration-name">...</span></p>
+        </div>
+        
+        <div id="success-state" style="display: none;">
+            <div class="status-icon success">✓</div>
+            <h2>Connected!</h2>
+            <p>Successfully connected to <span id="success-integration" class="integration-name"></span></p>
+            <div class="details">
+                <div>Status: <code>connected</code></div>
+                <div>Token: <code id="token-preview">...</code></div>
+                <div>Expires: <code id="token-expires">...</code></div>
+            </div>
+            <button class="btn btn-primary" onclick="closeWindow()">Close Window</button>
+            <button class="btn btn-secondary" onclick="goToIntegrations()">View Integrations</button>
+        </div>
+        
+        <div id="error-state" style="display: none;">
+            <div class="status-icon error">✕</div>
+            <h2>Connection Failed</h2>
+            <p id="error-message">An error occurred during OAuth authentication.</p>
+            <div class="error-details" id="error-details"></div>
+            <button class="btn btn-primary" onclick="retryConnection()">Try Again</button>
+            <button class="btn btn-secondary" onclick="closeWindow()">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:9000';
+        const API_KEY = 'finrag_at_2026';
+        
+        // Parse URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const state = urlParams.get('state');
+        const error = urlParams.get('error');
+        const errorDescription = urlParams.get('error_description');
+        
+        // Get integration info from localStorage
+        const integration = localStorage.getItem('oauth_integration') || 'unknown';
+        document.getElementById('integration-name').textContent = integration;
+        
+        async function processOAuthCallback() {
+            // Check for errors from OAuth provider
+            if (error) {
+                showError('OAuth provider error: ' + error, errorDescription);
+                return;
+            }
+            
+            // Validate required parameters
+            if (!code || !state) {
+                showError('Missing required parameters', 'Both "code" and "state" are required.');
+                return;
+            }
+            
+            // Verify state matches what we stored
+            const storedState = localStorage.getItem('oauth_state');
+            if (state !== storedState) {
+                showError('Invalid state parameter', 'The state parameter does not match. Possible CSRF attack.');
+                return;
+            }
+            
+            try {
+                // Exchange code for token
+                const response = await fetch(API_URL + '/integrations/oauth/callback', {
+                    method: 'POST',
+                    headers: {
+                        'X-API-KEY': API_KEY,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        code: code,
+                        state: state
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    showSuccess(data);
+                } else {
+                    showError('Backend error', data.message || 'Unknown error');
+                }
+            } catch (err) {
+                showError('Network error', err.message);
+            }
+        }
+        
+        function showSuccess(data) {
+            document.getElementById('loading-state').style.display = 'none';
+            document.getElementById('success-state').style.display = 'block';
+            document.getElementById('success-integration').textContent = integration;
+            
+            // Show token preview (masked)
+            if (data.token) {
+                const preview = data.token.substring(0, 10) + '...' + data.token.substring(data.token.length - 4);
+                document.getElementById('token-preview').textContent = preview;
+            }
+            
+            // Show expiration
+            if (data.expires_at) {
+                document.getElementById('token-expires').textContent = new Date(data.expires_at).toLocaleString();
+            } else {
+                document.getElementById('token-expires').textContent = 'Never';
+            }
+            
+            // Notify parent window if opened as popup
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({
+                    type: 'oauth-success',
+                    integration: integration,
+                    data: data
+                }, '*');
+            }
+            
+            // Clear stored OAuth data
+            localStorage.removeItem('oauth_state');
+            localStorage.removeItem('oauth_integration');
+        }
+        
+        function showError(message, details) {
+            document.getElementById('loading-state').style.display = 'none';
+            document.getElementById('error-state').style.display = 'block';
+            document.getElementById('error-message').textContent = message;
+            document.getElementById('error-details').textContent = details || '';
+            
+            // Notify parent window
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({
+                    type: 'oauth-error',
+                    integration: integration,
+                    error: message,
+                    details: details
+                }, '*');
+            }
+        }
+        
+        function closeWindow() {
+            window.close();
+        }
+        
+        function goToIntegrations() {
+            window.location.href = '/?section=integrations';
+        }
+        
+        function retryConnection() {
+            window.location.href = '/?section=integrations';
+        }
+        
+        // Start processing
+        processOAuthCallback();
+    </script>
+</body>
+</html>

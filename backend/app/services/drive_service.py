@@ -22,7 +22,7 @@ def find_or_create_folder(folder_name: str):
     try:
         service = get_drive_service()
     except Exception as e:
-        print(f"⚠️ Skipping Drive Folder Creation: {e}")
+        print(f"Skipping Drive Folder Creation: {e}")
         return None
 
     query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder'"
@@ -51,7 +51,7 @@ def upload_file(file_path, folder_id):
     try:
         service = get_drive_service()
     except Exception as e:
-        print(f"⚠️ Skipping Drive Upload: {e}")
+        print(f"Skipping Drive Upload: {e}")
         return "local_storage_only"
 
     media = MediaFileUpload(file_path)

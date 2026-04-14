@@ -32,7 +32,7 @@ with st.sidebar:
     st.info("⚡ Real-time financial intelligence enabled.")
 
 # --- Main Layout ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["🚀 Revert Analysis", "🔍 Market Intel", "📉 Portfolio Benchmark", "🛡️ Compliance & ESG", "🔗 Integrations"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["🚀 Revert Analysis", "🔍 Market Intel", "� Drafts", "🛡️ Compliance & ESG", "🔗 Integrations"])
 
 # --- TAB 1: REVERT ANALYSIS ---
 with tab1:
@@ -133,16 +133,6 @@ with tab2:
                             st.write("**Best Case (+20%)**")
                             st.dataframe(best_df, hide_index=True)
 
-                # Benchmarking section
-                benchmarks = search_res.get("benchmarks", {})
-                if benchmarks and "error" not in benchmarks:
-                    with st.expander(f"🏢 Sector Benchmarking: {benchmarks.get('sector')}", expanded=False):
-                        b_data = benchmarks.get("benchmarks", {})
-                        b_col1, b_col2, b_col3 = st.columns(3)
-                        b_col1.metric("Avg. Margin", b_data.get("avg_margin"))
-                        b_col2.metric("Rev. Multiple", b_data.get("revenue_multiple"))
-                        b_col3.metric("Growth Target", b_data.get("growth_benchmark"))
-
                 # Human-in-the-loop: Edit Projections
                 if active_projections:
                     with st.expander("🛠️ Verify & Edit Projections", expanded=False):
@@ -172,24 +162,31 @@ with tab2:
             else:
                 st.error("Fetch failed.")
 
-# --- TAB 3: PORTFOLIO BENCHMARK ---
+# --- TAB 3: DRAFTS ---
 with tab3:
-    st.header("📉 Portfolio Benchmarking (Alpha)")
-    st.markdown("Compare processed revert data against market benchmarks.")
+    st.header("� Pitch Deck Analysis Drafts")
+    st.markdown("View and manage your pitch deck analysis drafts.")
     
-    col_bench_1, col_bench_2 = st.columns(2)
-    with col_bench_1:
-        st.metric("Portfolio High Water Mark", "$4.2M ARR", "+12%")
-        st.metric("Avg. Burn Rate (SaaS)", "$120k / mo", "-2%")
-    with col_bench_2:
-        # Mock Comparative Chart
-        mock_data = pd.DataFrame({
-            'Category': ['Marketing', 'Product', 'Sales', 'Ops'],
-            'Selected Target': [30, 45, 20, 5],
-            'Industry Avg': [25, 40, 25, 10]
-        })
-        fig_mock = px.bar(mock_data, x='Category', y=['Selected Target', 'Industry Avg'], barmode='group', title="Expense Distribution vs Industry")
-        st.plotly_chart(fig_mock, use_container_width=True)
+    # Drafts list section
+    st.subheader("Saved Drafts")
+    drafts_container = st.container()
+    
+    # Mock drafts data - in production, this would come from the backend
+    mock_drafts = [
+        {"company": "TechCorp", "date": "2024-01-15", "status": "Completed", "confidence": "High"},
+        {"company": "HealthAI", "date": "2024-01-14", "status": "In Progress", "confidence": "Medium"},
+        {"company": "FinFlow", "date": "2024-01-13", "status": "Draft", "confidence": "Low"}
+    ]
+    
+    for draft in mock_drafts:
+        with st.expander(f"📄 {draft['company']} - {draft['date']} ({draft['status']})", expanded=False):
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Status", draft['status'])
+            col2.metric("Confidence", draft['confidence'])
+            col3.button("View Analysis", key=f"view_{draft['company']}")
+    
+    st.divider()
+    st.info("💡 Drafts are automatically saved when you analyze pitch decks in the Revert Analysis tab.")
 
 # --- TAB 4: COMPLIANCE & ESG ---
 with tab4:

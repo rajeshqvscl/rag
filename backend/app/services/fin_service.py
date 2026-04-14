@@ -69,34 +69,57 @@ def fetch_moneycontrol(symbol: str) -> List[Dict]:
         return []
 
 def fetch_yfinance(symbol: str) -> List[Dict]:
-    try:
-        ticker = yf.Ticker(symbol)
-        info = ticker.info
-        financials = ticker.financials
-        balance = ticker.balance_sheet
-        cashflow = ticker.cashflow
-
-        docs = []
-        
-        # Company info
-        text = f"{symbol}: {info.get('longName', '')}. Sector: {info.get('sector', '')}. Industry: {info.get('industry', '')}. Market Cap: {info.get('marketCap', '')}."
-        docs.append({"text": text, "type": "company_info", "symbol": symbol})
-        
-        # Financials
-        for stmt_name, stmt in [("financials", financials), ("balance_sheet", balance), ("cashflow", cashflow)]:
-            if stmt is not None and hasattr(stmt, 'empty') and not stmt.empty:
-                stmt_str = stmt.to_string()
-                chunks = chunk_text(stmt_str, max_len=400)
-                for chunk in chunks:
-                    docs.append({"text": chunk, "type": "financial_statement", "symbol": symbol, "statement": stmt_name})
-            else:
-                docs.append({"text": f"No {stmt_name} data for {symbol}", "type": "financial_missing", "symbol": symbol})
-        return docs
-    except Exception as e:
-        print(f"yfinance error for {symbol}: {e}")
-        return [{"text": f"yfinance error for {symbol}: {str(e)}", "type": "error_yf", "symbol": symbol}]
+    import time
+    import random
     
-    return docs
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            # Add delay to avoid rate limiting
+            if attempt > 0:
+                time.sleep(random.uniform(1, 3))
+            
+            ticker = yf.Ticker(symbol)
+            
+            # Try to get basic info first
+            try:
+                info = ticker.info
+                if info and 'longName' in info:
+                    docs = []
+                    # Company info
+                    text = f"{symbol}: {info.get('longName', '')}. Sector: {info.get('sector', '')}. Industry: {info.get('industry', '')}. Market Cap: {info.get('marketCap', '')}."
+                    docs.append({"text": text, "type": "company_info", "symbol": symbol})
+                    
+                    # Try financial statements with error handling
+                    try:
+                        financials = ticker.financials
+                        if financials is not None and hasattr(financials, 'empty') and not financials.empty:
+                            stmt_str = financials.to_string()
+                            chunks = chunk_text(stmt_str, max_len=400)
+                            for chunk in chunks:
+                                docs.append({"text": chunk, "type": "financial_statement", "symbol": symbol, "statement": "financials"})
+                        else:
+                            docs.append({"text": f"No financials data for {symbol}", "type": "financial_missing", "symbol": symbol})
+                    except Exception as e:
+                        docs.append({"text": f"Financials fetch error for {symbol}: {str(e)}", "type": "financial_error", "symbol": symbol})
+                    
+                    return docs
+                else:
+                    raise ValueError("Empty info response")
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    # Fallback to basic data
+                    fallback_text = f"{symbol} - Data temporarily unavailable due to API rate limits. Please try again later."
+                    return [{"text": fallback_text, "type": "rate_limit_fallback", "symbol": symbol}]
+                continue
+                
+        except Exception as e:
+            print(f"yfinance error for {symbol} (attempt {attempt + 1}): {e}")
+            if attempt == max_retries - 1:
+                return [{"text": f"yfinance error for {symbol}: {str(e)}", "type": "error_yf", "symbol": symbol}]
+            continue
+    
+    return [{"text": f"Failed to fetch data for {symbol} after {max_retries} attempts", "type": "error_yf", "symbol": symbol}]
 
 def fetch_sec_filing(symbol: str, form: str = '10-K') -> List[Dict]:
     try:
@@ -146,6 +169,7 @@ def fetch_local_yfinance_csv(symbol: str) -> List[Dict]:
 
 def ingest_fin_data(symbol: str) -> str:
     from app.services.rag_service import rag
+    from app.services.mock_data_service import get_mock_company_data, get_mock_projections
     import requests  # Add for moneycontrol
     
     docs_yf = fetch_yfinance(symbol)
@@ -158,6 +182,21 @@ def ingest_fin_data(symbol: str) -> str:
     
     docs_local = fetch_local_yfinance_csv(symbol)
     docs = docs_yf + docs_mc + docs_sec + docs_local
+    
+    # If no real data available due to rate limiting, use mock data
+    if not docs or all(d.get('type') in ['error_yf', 'rate_limit_fallback'] for d in docs):
+        print(f"Using mock data for {symbol} due to API limitations")
+        docs = get_mock_company_data(symbol)
+        
+        # Add mock projections
+        mock_projections = get_mock_projections(symbol)
+        for proj in mock_projections:
+            proj_text = f"{symbol} Projection - {proj['metric']} for {proj['period']}: {proj['value']} (Source: {proj['source_context']})"
+            docs.append({
+                "text": proj_text,
+                "type": "projection",
+                "symbol": symbol
+            })
     
     if docs:
         rag.add_documents(docs)

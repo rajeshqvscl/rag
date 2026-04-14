@@ -2,18 +2,25 @@ from app.services.drive_service import find_or_create_folder, upload_file
 from app.services.file_extractor import extract_text
 from app.services.claude_service import structure_text
 from app.services.rag_service import rag
+from app.services.fin_service import ingest_fin_data
+
+# Optional Celery import
+try:
+    from app.celery_app import celery_app
+except ImportError:
+    celery_app = None
 
 
 def process_file_task(file_path, file_name, company):
     try:
-        print("\n🚀 ===== TASK STARTED =====")
-        print("📄 File:", file_name)
+        print("\n===== TASK STARTED =====")
+        print("File:", file_name)
 
         # 1. Drive Upload
         folder_id = find_or_create_folder(company)
         drive_id = upload_file(file_path, folder_id)
 
-        print("☁️ Uploaded:", drive_id)
+        print("Uploaded:", drive_id)
 
         # 2. Extract
         text = extract_text(file_path)
@@ -31,7 +38,7 @@ def process_file_task(file_path, file_name, company):
             "section": structured.get("section", "general")
         }])
 
-        print("✅ Stored in RAG:", rag.index.ntotal)
+        print("Stored in RAG:", rag.index.ntotal)
 
         return {
             "status": "success",
@@ -41,5 +48,17 @@ def process_file_task(file_path, file_name, company):
         }
 
     except Exception as e:
-        print("❌ ERROR:", str(e))
+        print("ERROR:", str(e))
         return {"status": "error", "error": str(e)}
+
+# Only register Celery task if celery is available
+def ingest_market_data_task(symbol):
+    try:
+        from app.services.fin_service import ingest_fin_data
+        return ingest_fin_data(symbol)
+    except Exception as e:
+        return str(e)
+
+# Register with Celery if available
+if celery_app:
+    ingest_market_data_task = celery_app.task(name="ingest_market_data_task")(ingest_market_data_task)
