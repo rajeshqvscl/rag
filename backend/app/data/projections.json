@@ -316,30 +316,6 @@
     },
     {
       "metric": "Revenue",
-      "value": "6700000",
-      "period": "2023",
-      "source_context": "Extracted from uploaded documents."
-    },
-    {
-      "metric": "Revenue",
-      "value": "28000000",
-      "period": "2024",
-      "source_context": "Extracted from uploaded documents."
-    },
-    {
-      "metric": "Revenue",
-      "value": "70000000",
-      "period": "2025",
-      "source_context": "Extracted from uploaded documents."
-    },
-    {
-      "metric": "Revenue",
-      "value": "128000000",
-      "period": "2026",
-      "source_context": "Extracted from uploaded documents."
-    },
-    {
-      "metric": "Revenue",
       "value": "60000000",
       "period": "2023",
       "source_context": "Extracted from uploaded documents."
@@ -581,6 +557,30 @@
     {
       "metric": "Revenue",
       "value": "60000000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "280000000",
+      "period": "2024",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "700000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1280000000",
+      "period": "2026",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "67200000",
       "period": "2023",
       "source_context": "Extracted from uploaded documents."
     },
