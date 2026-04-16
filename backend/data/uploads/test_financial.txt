@@ -1,7 +1,0 @@
-Test Company Financials
-Revenue 2023: 5,000,000
-Revenue 2022: 3,500,000
-Growth Rate: 43%
-Business Model: SaaS platform
-Customers: 500+
-ARR: 4,200,000
