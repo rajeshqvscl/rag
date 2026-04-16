@@ -168,7 +168,8 @@ class MultiModalService:
                 "charts": [],
                 "tables": [],
                 "numbers": [],
-                "financial_terms": []
+                "financial_terms": [],
+                "revenue_trajectory": []  # Extracted revenue data from graphs
             }
             
             # Extract financial terms from text content
@@ -192,6 +193,9 @@ class MultiModalService:
             numbers = re.findall(r'\$?\d+(?:,\d{3})*(?:\.\d+)?(?:[KMB]?)?', text)
             financial_data["numbers"] = numbers[:20]  # Limit to first 20 numbers
             
+            # Extract revenue trajectory from charts
+            financial_data["revenue_trajectory"] = self.extract_revenue_trajectory_from_image(image, analysis)
+            
             # Analyze detected charts
             for chart in analysis.get("charts_detected", []):
                 chart_data = {
@@ -208,6 +212,84 @@ class MultiModalService:
         except Exception as e:
             print(f"Error extracting financial data from image: {e}")
             return {"error": str(e)}
+    
+    def extract_revenue_trajectory_from_image(self, image: Image.Image, analysis: Dict) -> List[Dict]:
+        """Extract revenue trajectory data from chart images"""
+        try:
+            import re
+            
+            text = analysis.get("text_content", "")
+            revenue_data = []
+            
+            # Pattern to match year-revenue pairs from OCR text
+            # Looks for patterns like "2024 $10M", "2025: $15M", "2024 - 10,000,000", etc.
+            year_revenue_patterns = [
+                r'(\d{4})\s*[:\-\s]\s*\$?([\d,]+(?:\.\d+)?)\s*([KMB]?)',
+                r'(\d{4})\s*\$?([\d,]+(?:\.\d+)?)\s*([KMB]?)',
+                r'\$?([\d,]+(?:\.\d+)?)\s*([KMB]?)\s*[:\-\s]\s*(\d{4})',
+            ]
+            
+            for pattern in year_revenue_patterns:
+                matches = re.findall(pattern, text, re.IGNORECASE)
+                for match in matches:
+                    try:
+                        # Determine which group is year and which is revenue
+                        if len(match) == 3:
+                            if match[0].isdigit() and len(match[0]) == 4:
+                                year = match[0]
+                                revenue_str = match[1]
+                                unit = match[2].upper()
+                            else:
+                                year = match[2]
+                                revenue_str = match[0]
+                                unit = match[1].upper()
+                            
+                            # Parse revenue value
+                            revenue_num = float(revenue_str.replace(',', ''))
+                            
+                            # Convert to actual number based on unit
+                            if unit == 'B':
+                                revenue_num *= 1000000000
+                            elif unit == 'M':
+                                revenue_num *= 1000000
+                            elif unit == 'K':
+                                revenue_num *= 1000
+                            
+                            # Only add if year is reasonable (2000-2100) and revenue is positive
+                            if 2000 <= int(year) <= 2100 and revenue_num > 0:
+                                revenue_data.append({
+                                    "year": year,
+                                    "revenue": int(revenue_num)
+                                })
+                    except (ValueError, IndexError) as e:
+                        continue
+            
+            # If no year-revenue pairs found, try to extract just revenue numbers with context
+            if not revenue_data:
+                # Look for revenue-like numbers in the text
+                revenue_numbers = re.findall(r'\$?([\d,]+(?:\.\d+)?)\s*([KMB]?)\s*(?:million|billion|thousand)?', text, re.IGNORECASE)
+                
+                # If we found numbers but no years, we can't create a trajectory
+                # Just return empty list - we need explicit year-revenue pairs from the graph
+            
+            # Sort by year and remove duplicates
+            if revenue_data:
+                revenue_data = sorted(revenue_data, key=lambda x: int(x['year']))
+                # Remove duplicates (keep first occurrence)
+                seen_years = set()
+                unique_data = []
+                for item in revenue_data:
+                    if item['year'] not in seen_years:
+                        seen_years.add(item['year'])
+                        unique_data.append(item)
+                revenue_data = unique_data
+            
+            print(f"Extracted revenue trajectory from image: {revenue_data}")
+            return revenue_data
+            
+        except Exception as e:
+            print(f"Error extracting revenue trajectory: {e}")
+            return []
     
     def classify_chart_type(self, chart_info: Dict) -> str:
         """Classify chart type based on aspect ratio and other features"""

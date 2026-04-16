@@ -304,30 +304,6 @@
   "Bijliride Pitch Deck V4": [
     {
       "metric": "Revenue",
-      "value": "70000000",
-      "period": "2025",
-      "source_context": "Extracted from uploaded documents."
-    },
-    {
-      "metric": "Revenue",
-      "value": "128000000",
-      "period": "2026",
-      "source_context": "Extracted from uploaded documents."
-    },
-    {
-      "metric": "Revenue",
-      "value": "60000000",
-      "period": "2023",
-      "source_context": "Extracted from uploaded documents."
-    },
-    {
-      "metric": "Revenue",
-      "value": "280000000",
-      "period": "2024",
-      "source_context": "Extracted from uploaded documents."
-    },
-    {
-      "metric": "Revenue",
       "value": "700000000",
       "period": "2025",
       "source_context": "Extracted from uploaded documents."
@@ -601,6 +577,30 @@
       "value": "1280000000",
       "period": "2026",
       "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "67200000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "280000000",
+      "period": "2024",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "700000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1280000000",
+      "period": "2026",
+      "source_context": "Extracted from uploaded documents."
     }
   ],
   "Pitchdeck": [
@@ -638,6 +638,44 @@
       "metric": "Revenue",
       "value": "20000000",
       "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    }
+  ],
+  "LabBuddy Pitch Deck": [
+    {
+      "metric": "Revenue",
+      "value": "810000",
+      "period": "Sep-25",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1244000",
+      "period": "Oct-25",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1291000",
+      "period": "Nov-25",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1615000",
+      "period": "Dec-25",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1802000",
+      "period": "Jan-26",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "2174000",
+      "period": "Feb-26",
       "source_context": "Extracted from uploaded documents."
     }
   ]

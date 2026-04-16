@@ -1,13 +1,14 @@
 """
 Database models for PostgreSQL migration
 """
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Float, Boolean, JSON, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, JSON, Float
+from sqlalchemy.orm import relationship
+from app.utils.pgvector_type import Vector
 from datetime import datetime
 import os
 
-Base = declarative_base()
+# Import Base from config to avoid circular imports
+from app.config.database import Base
 
 class User(Base):
     __tablename__ = "users"
@@ -70,6 +71,63 @@ class Library(Base):
     # Relationships
     user = relationship("User")
 
+class PitchDeck(Base):
+    """Store pitch deck PDFs with metadata"""
+    __tablename__ = "pitch_decks"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    
+    # Company information
+    company_name = Column(String, index=True, nullable=False)
+    company_website = Column(String)
+    industry = Column(String, index=True)
+    stage = Column(String, index=True)  # 'Pre-seed', 'Seed', 'Series A', 'Series B', etc.
+    location = Column(String)
+    
+    # Funding information
+    funding_stage = Column(String)
+    funding_amount = Column(String)  # e.g., "$5M"
+    funding_currency = Column(String, default="USD")
+    valuation = Column(String)
+    
+    # File information
+    file_name = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)
+    file_size = Column(Integer)  # in bytes
+    file_type = Column(String, default="application/pdf")
+    pdf_pages = Column(Integer)
+    
+    # Pitch deck content (extracted text)
+    extracted_text = Column(Text)
+    summary = Column(Text)
+    key_metrics = Column(JSON, default=dict)  # {'revenue': '$1M', 'growth': '50%', 'users': '10000'}
+    revenue_data = Column(JSON, default=list)  # [{'year': '2024', 'revenue': 1000000}, ...] - extracted from graphs
+    
+    # AI-generated analysis and email draft
+    analysis = Column(Text)  # Full investment analysis
+    email_draft = Column(Text)  # Generated outreach email
+    
+    # Team information
+    founders = Column(JSON, default=list)  # ['John Doe - CEO', 'Jane Smith - CTO']
+    team_size = Column(Integer)
+    
+    # Status and tracking
+    status = Column(String, default="new")  # 'new', 'reviewed', 'interested', 'passed', 'funded'
+    priority = Column(String, default="medium")  # 'low', 'medium', 'high'
+    rating = Column(Float)  # 1-10 rating
+    tags = Column(JSON, default=list)
+    notes = Column(Text)
+    
+    # Dates
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    reviewed_at = Column(DateTime)
+    last_viewed_at = Column(DateTime)
+    
+    # Relationships
+    user = relationship("User")
+
+
 class Conversation(Base):
     __tablename__ = "conversations"
     
@@ -93,14 +151,65 @@ class Memory(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     conversation_id = Column(Integer, ForeignKey("conversations.id"))
     text = Column(Text, nullable=False)
-    embedding = Column(JSON)  # Store embedding as JSON array
-    vector_id = Column(Integer)  # Reference to vector index
+    embedding = Column(JSON)  # Store embedding as JSON array (fallback for non-PG)
+    embedding_vector = Column(Vector(384))  # pgvector storage for similarity search
+    vector_id = Column(Integer)  # Reference to FAISS index (optional)
     tags = Column(JSON, default=list)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
     user = relationship("User", back_populates="memories")
     conversation = relationship("Conversation", back_populates="memories")
+
+
+class EmailReply(Base):
+    """Store email replies from clients/investors with intent classification"""
+    __tablename__ = "email_replies"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    
+    # Sender information
+    sender_email = Column(String, index=True, nullable=False)
+    sender_name = Column(String)
+    sender_type = Column(String, default="unknown")  # 'client', 'investor', 'unknown'
+    sender_confidence = Column(Float, default=0.0)  # Confidence in sender type identification
+    
+    # Email content
+    subject = Column(String)
+    body_text = Column(Text)
+    body_html = Column(Text)
+    
+    # Intent classification
+    intent_status = Column(String, default="pending")  # 'interested', 'not_interested', 'pending'
+    intent_keywords = Column(JSON, default=list)  # ['not interested', 'interested', 'maybe', etc.]
+    intent_confidence = Column(Float, default=0.0)  # 0.0 to 1.0
+    combined_confidence = Column(Float, default=0.0)  # Combined sender + intent confidence
+    
+    # Classification method tracking
+    classification_method = Column(String)  # 'claude_high_confidence', 'keyword_only', 'blended', etc.
+    is_claude_identified = Column(Boolean, default=False)  # Whether Claude AI was used
+    claude_analysis = Column(JSON)  # Full Claude analysis results
+    classification_reasoning = Column(Text)  # Human-readable reasoning
+    
+    # Related deal/company
+    company = Column(String, index=True)
+    draft_id = Column(Integer, ForeignKey("drafts.id"), nullable=True)
+    
+    # Email metadata
+    received_at = Column(DateTime, default=datetime.utcnow)
+    email_date = Column(DateTime)
+    message_id = Column(String, unique=True)
+    thread_id = Column(String, index=True)
+    
+    # Processing status
+    processed = Column(Boolean, default=False)
+    processed_at = Column(DateTime)
+    notes = Column(Text)
+    
+    # Relationships
+    user = relationship("User")
+    draft = relationship("Draft")
 
 class Analytics(Base):
     __tablename__ = "analytics"
@@ -127,18 +236,3 @@ class Settings(Base):
     
     # Relationships
     user = relationship("User")
-
-# Database connection
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/finrag")
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-def create_tables():
-    Base.metadata.create_all(bind=engine)

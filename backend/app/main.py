@@ -1,5 +1,10 @@
 import sys
 import os
+from dotenv import load_dotenv
+
+# Load environment variables FIRST before any imports
+load_dotenv()
+
 # Fix Windows encoding issues
 if sys.platform == 'win32':
     import io
@@ -7,15 +12,11 @@ if sys.platform == 'win32':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 from fastapi import FastAPI
-from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi import Depends
 from app.services.security_service import get_api_key
-
-
-load_dotenv()
 
 app = FastAPI(
     title="FinRAG Intelligence Portal"
@@ -70,41 +71,59 @@ async def global_exception_handler(request, exc):
         content={"status": "error", "message": str(exc), "traceback": error_details}
     )
 
-from app.routes.email_webhook import router as email_router
 from app.routes.query import router as query_router
-from app.routes.fin_ingest import router as fin_router
-from app.routes.agent import router as agent_router
 from app.routes.library import router as library_router
-from app.routes.integrations import router as integrations_router
 from app.routes.settings import router as settings_router
+from app.routes.upload import router as upload_router
+from app.routes.auth import router as auth_router
+from app.routes.fin_ingest import router as fin_ingest_router
+from app.routes.memory import router as memory_router
 from app.routes.drafts import router as drafts_router
 from app.routes.analytics import router as analytics_router
-from app.routes.upload import router as upload_router
-from app.routes.market import router as market_router
-from app.routes.auth import router as auth_router
-from app.routes.backup import router as backup_router
-from app.routes.predictive import router as predictive_router
-from app.routes.collaboration import router as collaboration_router
-from app.routes.sentiment import router as sentiment_router
+from app.routes.integrations import router as integrations_router
 from app.routes.crm import router as crm_router
+from app.routes.predictive import router as predictive_router
+from app.routes.pgvector_memory import router as pgvector_memory_router
+from app.routes.pitch_deck import router as pitch_deck_router
+from app.routes.sentiment import router as sentiment_router
+from app.routes.search import router as search_router
+from app.routes.context_memory import router as context_memory_router
+from app.routes.email_reply import router as email_reply_router
+from app.routes.email_webhook import router as email_webhook_router
+from app.routes.agent import router as agent_router
+from app.routes.backup import router as backup_router
+from app.routes.cache import router as cache_router
+from app.routes.collaboration import router as collaboration_router
+from app.routes.enterprise_security import router as enterprise_security_router
+from app.routes.market import router as market_router
+from app.routes.multimodal import router as multimodal_router
 
-app.include_router(email_router, dependencies=[Depends(get_api_key)])
 app.include_router(query_router, dependencies=[Depends(get_api_key)])
-app.include_router(fin_router, dependencies=[Depends(get_api_key)])
-app.include_router(agent_router, dependencies=[Depends(get_api_key)])
 app.include_router(library_router, dependencies=[Depends(get_api_key)])
-app.include_router(integrations_router, dependencies=[Depends(get_api_key)])
 app.include_router(settings_router, dependencies=[Depends(get_api_key)])
+app.include_router(upload_router, dependencies=[Depends(get_api_key)])
+app.include_router(auth_router)
+app.include_router(fin_ingest_router, dependencies=[Depends(get_api_key)])
+app.include_router(memory_router, dependencies=[Depends(get_api_key)])
 app.include_router(drafts_router, dependencies=[Depends(get_api_key)])
 app.include_router(analytics_router, dependencies=[Depends(get_api_key)])
-app.include_router(upload_router, dependencies=[Depends(get_api_key)])
-app.include_router(market_router, dependencies=[Depends(get_api_key)])
-app.include_router(auth_router)
-app.include_router(backup_router, dependencies=[Depends(get_api_key)])
-app.include_router(predictive_router, dependencies=[Depends(get_api_key)])
-app.include_router(collaboration_router, dependencies=[Depends(get_api_key)])
-app.include_router(sentiment_router, dependencies=[Depends(get_api_key)])
+app.include_router(integrations_router, dependencies=[Depends(get_api_key)])
 app.include_router(crm_router, dependencies=[Depends(get_api_key)])
+app.include_router(predictive_router, dependencies=[Depends(get_api_key)])
+app.include_router(pgvector_memory_router, dependencies=[Depends(get_api_key)])
+app.include_router(pitch_deck_router, dependencies=[Depends(get_api_key)])
+app.include_router(sentiment_router, dependencies=[Depends(get_api_key)])
+app.include_router(search_router, dependencies=[Depends(get_api_key)])
+app.include_router(context_memory_router, dependencies=[Depends(get_api_key)])
+app.include_router(email_reply_router, dependencies=[Depends(get_api_key)])
+app.include_router(email_webhook_router, dependencies=[Depends(get_api_key)])
+app.include_router(agent_router, dependencies=[Depends(get_api_key)])
+app.include_router(backup_router, dependencies=[Depends(get_api_key)])
+app.include_router(cache_router, dependencies=[Depends(get_api_key)])
+app.include_router(collaboration_router, dependencies=[Depends(get_api_key)])
+app.include_router(enterprise_security_router, dependencies=[Depends(get_api_key)])
+app.include_router(market_router, dependencies=[Depends(get_api_key)])
+app.include_router(multimodal_router, dependencies=[Depends(get_api_key)])
 
 # Health Check Endpoint
 @app.get("/health")

@@ -23,6 +23,14 @@
     {
       "role": "assistant",
       "content": "Analysis temporarily unavailable due to API limitations. Found 5 relevant documents. Query: Microsoft"
+    },
+    {
+      "role": "user",
+      "content": "test"
+    },
+    {
+      "role": "assistant",
+      "content": "Analysis temporarily unavailable due to API limitations. Found 5 relevant documents. Query: test"
     }
   ]
 }

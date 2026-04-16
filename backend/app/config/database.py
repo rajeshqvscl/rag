@@ -3,7 +3,7 @@ Database configuration and connection management
 """
 import os
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import StaticPool
 
 # Database configuration
@@ -36,8 +36,8 @@ else:
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Import Base from models to ensure all models are registered
-from app.models.database import Base
+# Define Base here to avoid circular imports
+Base = declarative_base()
 
 def get_db():
     """Dependency to get database session"""
@@ -49,4 +49,6 @@ def get_db():
 
 def init_db():
     """Initialize database tables"""
+    # Import models here to ensure they're registered with Base
+    from app.models import database
     Base.metadata.create_all(bind=engine)

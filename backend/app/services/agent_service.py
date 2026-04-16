@@ -1,33 +1,34 @@
 import os
 import json
 from anthropic import Anthropic
-from app.services.fin_service import fetch_yfinance, fetch_sec_filing
 
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 MODEL = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")
 
+# Tools available to the agent (market data tools removed)
 TOOLS = [
     {
-        "name": "get_stock_info",
-        "description": "Get detailed financial information and company overview for a stock symbol from Yahoo Finance.",
+        "name": "search_knowledge_base",
+        "description": "Search the internal knowledge base for documents, pitch decks, and previous analysis.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "symbol": {"type": "string", "description": "The stock ticker symbol, e.g., AAPL"}
+                "query": {"type": "string", "description": "The search query"},
+                "context": {"type": "string", "description": "Optional context filter (company, deal, market, financial, general)"}
             },
-            "required": ["symbol"]
+            "required": ["query"]
         }
     },
     {
-        "name": "get_sec_filings",
-        "description": "Fetch and search SEC filings (like 10-K) for a given stock symbol.",
+        "name": "get_email_replies",
+        "description": "Get email replies and their classification status for a company or investor.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "symbol": {"type": "string", "description": "The stock ticker symbol"},
-                "form_type": {"type": "string", "description": "Form type, default is 10-K"}
-            },
-            "required": ["symbol"]
+                "company": {"type": "string", "description": "Company name to filter by"},
+                "sender_type": {"type": "string", "description": "Filter by sender type: investor, client, unknown"},
+                "intent_status": {"type": "string", "description": "Filter by intent: interested, not_interested, pending"}
+            }
         }
     }
 ]
@@ -60,12 +61,51 @@ def process_agent_query(user_query: str, history=None):
 
         # Execute Tool
         result = "Tool execution failed."
-        if tool_name == "get_stock_info":
-            docs = fetch_yfinance(tool_input["symbol"])
-            result = "\n".join([d["text"] for d in docs[:3]]) # Summary
-        elif tool_name == "get_sec_filings":
-            docs = fetch_sec_filing(tool_input["symbol"], tool_input.get("form_type", "10-K"))
-            result = "\n".join([d["text"] for d in docs[:3]]) # Summary
+        if tool_name == "search_knowledge_base":
+            # Search internal knowledge base
+            try:
+                from app.services.pgvector_memory_service import pgvector_memory_service
+                memories = pgvector_memory_service.search_similar(
+                    query=tool_input.get("query", ""),
+                    k=5
+                )
+                if memories:
+                    result = "Found relevant information:\n" + "\n".join([
+                        f"- {m.get('text', '')[:200]}..." for m in memories[:3]
+                    ])
+                else:
+                    result = "No relevant information found in knowledge base."
+            except Exception as e:
+                result = f"Knowledge base search error: {str(e)}"
+                
+        elif tool_name == "get_email_replies":
+            # Get email replies
+            try:
+                from app.config.database import get_db
+                from app.models.database import EmailReply
+                db = next(get_db())
+                
+                query = db.query(EmailReply)
+                if tool_input.get("company"):
+                    query = query.filter(EmailReply.company.ilike(f"%{tool_input['company']}%"))
+                if tool_input.get("sender_type"):
+                    query = query.filter(EmailReply.sender_type == tool_input["sender_type"])
+                if tool_input.get("intent_status"):
+                    query = query.filter(EmailReply.intent_status == tool_input["intent_status"])
+                
+                replies = query.order_by(EmailReply.received_at.desc()).limit(5).all()
+                
+                if replies:
+                    result = f"Found {len(replies)} email replies:\n" + "\n".join([
+                        f"- From {r.sender_name or r.sender_email}: {r.intent_status} ({r.sender_type})"
+                        for r in replies
+                    ])
+                else:
+                    result = "No email replies found matching the criteria."
+                    
+                db.close()
+            except Exception as e:
+                result = f"Email search error: {str(e)}"
 
         # Continue Conversation
         messages.append({"role": "assistant", "content": response.content})

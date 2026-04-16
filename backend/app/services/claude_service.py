@@ -357,6 +357,172 @@ This document has been analyzed using enhanced pattern recognition and keyword e
             "fallback_used": True
         }
 
+def analyze_pitch_deck_detailed(extracted_text: str, company_name: str, key_metrics: dict = None) -> dict:
+    """
+    Performs detailed VC-style analysis of a pitch deck with comprehensive sections.
+    Returns structured analysis with Executive Summary, Strengths, Risks, Financials, and Recommendation.
+    """
+    metrics_str = json.dumps(key_metrics, indent=2) if key_metrics else "No metrics available"
+    
+    prompt = f"""You are a senior venture capital analyst at a top-tier VC firm. Perform a comprehensive analysis of the following pitch deck for {company_name}.
+
+EXTRACTED PITCH DECK CONTENT:
+{extracted_text[:12000]}
+
+EXTRACTED METRICS:
+{metrics_str}
+
+Provide a detailed investment analysis in the following format:
+
+## Executive Summary
+Provide a compelling 2-3 paragraph overview of the business, including:
+- What the company does (value proposition)
+- Target market and problem being solved
+- Current traction and key achievements
+- Funding stage and capital requirements
+
+## Key Metrics
+List all quantitative metrics found or implied:
+- Revenue (current, growth rate)
+- Users/Customers
+- Fleet size, transaction volume, or other operational metrics
+- Retention rates, occupancy rates
+- Market size (TAM/SAM/SOM if available)
+
+## Key Strengths
+Identify 4-6 major competitive advantages:
+1. **Market Positioning** - Unique market opportunity, timing, differentiation
+2. **Value Proposition** - Product/service advantages, innovation
+3. **Operational Metrics** - Strong unit economics, retention, efficiency
+4. **Strategic Partnerships** - Key customers, distribution partners, investors
+5. **Team Quality** - Founder background, relevant experience, domain expertise
+6. **Traction** - Growth rate, customer validation, revenue milestones
+
+## Key Risks & Concerns
+Identify 4-6 major risk factors:
+1. **Business Model Risks** - Capital intensity, scalability challenges, unit economics concerns
+2. **Market Risks** - Competition, market timing, adoption barriers
+3. **Execution Risks** - Team gaps, geographic expansion challenges, operational complexity
+4. **Financial Risks** - Burn rate, runway, capital efficiency, unclear path to profitability
+5. **Technology/Platform Risks** - Technical debt, infrastructure dependencies
+6. **Regulatory/Compliance Risks** - Industry regulations, policy changes
+
+## Financial Highlights
+### Current Performance
+- Revenue metrics (MRR, ARR, monthly revenue)
+- Growth trajectory (YoY, MoM)
+- Key operational metrics
+
+### Growth Projections
+- Revenue forecasts for next 3-5 years
+- Market expansion plans
+- Customer/user acquisition targets
+
+### Fund Utilization
+- Breakdown of how raised capital will be used
+- Major expense categories
+
+### Unit Economics
+- CAC, LTV, payback period (if available)
+- Margins and profitability indicators
+- Path to unit profitability
+
+## Investment Recommendation
+Provide a clear stance:
+- **STRONG INTEREST / CONSIDER / PASS / PROCEED WITH CAUTION**
+
+Include 3-5 specific due diligence priorities:
+1. Key questions to validate
+2. Areas requiring deeper investigation
+3. Critical assumptions to test
+
+Conclude with overall investment thesis in 2-3 sentences.
+
+---
+Format the output as clean markdown with proper headers (##), bold key terms (**), and bullet points.
+Be specific, use data from the pitch deck where available, and provide actionable insights."""
+
+    try:
+        response = call_claude_with_retry([{"role": "user", "content": prompt}], max_tokens=2500)
+        detailed_analysis = response.content[0].text
+        
+        # Extract revenue data from the analysis text
+        revenue_data = extract_revenue_from_analysis(detailed_analysis)
+        
+        return {
+            "detailed_analysis": detailed_analysis,
+            "revenue_data": revenue_data,
+            "analysis_type": "detailed_vc"
+        }
+    except Exception as e:
+        print(f"Claude API error in detailed analysis: {e}")
+        return {
+            "detailed_analysis": None,
+            "revenue_data": [],
+            "analysis_type": "fallback",
+            "error": str(e)
+        }
+
+def extract_revenue_from_analysis(analysis_text: str) -> list:
+    """Extract year-revenue pairs from the detailed analysis text."""
+    import re
+    revenue_data = []
+    
+    # Look for patterns like "2024: ₹28 crores" or "2025: $70M" or "Year 2026: $128M"
+    patterns = [
+        r'(?:20\d{2})[\s:]+(?:[₹$]?[\d,.]+\s*(?:crores?|M|B|K|lakhs?)?)',
+        r'(?:Year\s+)?(20\d{2})[\s:]+[₹$]?([\d,.]+)\s*(crores?|M|B|K|lakhs?)?',
+    ]
+    
+    for pattern in patterns:
+        matches = re.findall(pattern, analysis_text, re.IGNORECASE)
+        for match in matches:
+            if isinstance(match, tuple):
+                year, amount, unit = match if len(match) >= 3 else (match[0], match[1], '')
+            else:
+                # Extract year and amount from the full match
+                year_match = re.search(r'(20\d{2})', match)
+                amount_match = re.search(r'[₹$]?([\d,.]+)', match)
+                if year_match and amount_match:
+                    year = year_match.group(1)
+                    amount = amount_match.group(1)
+                    unit = ''
+                else:
+                    continue
+            
+            try:
+                amount_clean = amount.replace(',', '')
+                revenue_val = float(amount_clean)
+                
+                # Convert to standard format
+                if unit and 'crore' in unit.lower():
+                    revenue_val *= 10000000  # 1 crore = 10 million
+                elif unit and 'lakh' in unit.lower():
+                    revenue_val *= 100000  # 1 lakh = 100k
+                elif unit and unit.upper() == 'M':
+                    revenue_val *= 1000000
+                elif unit and unit.upper() == 'B':
+                    revenue_val *= 1000000000
+                elif unit and unit.upper() == 'K':
+                    revenue_val *= 1000
+                
+                revenue_data.append({
+                    "year": year,
+                    "revenue": int(revenue_val)
+                })
+            except:
+                pass
+    
+    # Remove duplicates and sort by year
+    seen = set()
+    unique_data = []
+    for item in revenue_data:
+        if item['year'] not in seen:
+            seen.add(item['year'])
+            unique_data.append(item)
+    
+    return sorted(unique_data, key=lambda x: x['year'])
+
 def generate_draft_email(analysis_summary: str, company: str, revenue_data: list = None):
     """Generates a professional email draft based on the document analysis and financial projections."""
     

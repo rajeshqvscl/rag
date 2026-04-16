@@ -8,6 +8,8 @@ google-auth
 google-auth-oauthlib
 python-multipart
 pypdf
+pdf2image
+pytesseract
 python-docx
 pandas
 openpyxl
@@ -15,8 +17,6 @@ celery
 redis
 requests
 python-dotenv
-yfinance==0.2.40
-sec-edgar-downloader==5.1.0
 beautifulsoup4==4.12.3
 lxml==5.3.0
 
