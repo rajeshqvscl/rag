@@ -2,8 +2,16 @@ import os
 import json
 from anthropic import Anthropic
 
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+# Lazy load client to reduce startup memory
+_client = None
 MODEL = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")
+
+def _get_client():
+    global _client
+    if _client is None:
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        _client = Anthropic(api_key=api_key)
+    return _client
 
 # Tools available to the agent (market data tools removed)
 TOOLS = [
@@ -38,7 +46,7 @@ def process_agent_query(user_query: str, history=None):
     messages.append({"role": "user", "content": user_query})
 
     try:
-        response = client.messages.create(
+        response = _get_client().messages.create(
             model=MODEL,
             max_tokens=2000,
             tools=TOOLS,
@@ -120,7 +128,7 @@ def process_agent_query(user_query: str, history=None):
             ]
         })
 
-        response = client.messages.create(
+        response = _get_client().messages.create(
             model=MODEL,
             max_tokens=2000,
             tools=TOOLS,

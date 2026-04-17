@@ -32,7 +32,8 @@ class RAGService:
         # Ensure directory exists
         os.makedirs(os.path.dirname(self.index_path), exist_ok=True)
 
-        self.load()
+        # Lazy load - don't load index on startup to save memory
+        # Index will be loaded on first use
         
     def _create_index(self):
         """Create appropriate FAISS index based on configuration"""
