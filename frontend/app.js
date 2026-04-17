@@ -1,4 +1,6 @@
-const API_URL = "http://127.0.0.1:9000"; // Local FastAPI backend
+const API_URL = window.location.hostname === 'localhost' 
+    ? "http://localhost:9000"  // Local development
+    : "";  // Production - use same origin (backend serves frontend)
 
 // ============ AUTHENTICATION ============
 
