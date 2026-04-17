@@ -4,7 +4,6 @@ Market data service for real-time financial information
 import os
 import requests
 import json
-import yfinance as yf
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from app.config.database import get_db
@@ -44,32 +43,8 @@ class MarketDataService:
         if cached_data:
             return cached_data
         
-        try:
-            # Try yfinance first (free and reliable)
-            ticker = yf.Ticker(symbol)
-            info = ticker.info
-            hist = ticker.history(period="1d")
-            
-            if info and 'regularMarketPrice' in info:
-                data = {
-                    "symbol": symbol,
-                    "price": info.get('regularMarketPrice', 0),
-                    "change": info.get('regularMarketChange', 0),
-                    "change_percent": info.get('regularMarketChangePercent', 0),
-                    "volume": info.get('regularMarketVolume', 0),
-                    "market_cap": info.get('marketCap', 0),
-                    "pe_ratio": info.get('trailingPE', 0),
-                    "high_52w": info.get('fiftyTwoWeekHigh', 0),
-                    "low_52w": info.get('fiftyTwoWeekLow', 0),
-                    "updated": datetime.utcnow().isoformat(),
-                    "source": "yfinance"
-                }
-                self.set_cache(cache_key, data)
-                return data
-        except Exception as e:
-            print(f"YFinance failed for {symbol}: {e}")
-        
-        # Try Alpha Vantage as fallback
+        # yfinance disabled - using Alpha Vantage or mock data
+        # Try Alpha Vantage first
         if self.alpha_vantage_key:
             try:
                 url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={self.alpha_vantage_key}"
