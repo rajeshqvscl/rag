@@ -23,11 +23,11 @@ class RAGService:
         self.hnsw_m = hnsw_m
         self.hnsw_ef_construction = hnsw_ef_construction
         self.hnsw_ef_search = hnsw_ef_search
-        self.vector_dim = 384  # Dimension of all-MiniLM-L6-v2 embeddings
+        self.vector_dim = 1536  # Dimension of voyage-large-2 embeddings
 
         self.index_path = "app/data/faiss_index/index.faiss"
         self.meta_path = "app/data/faiss_index/meta.pkl"
-        self.model_name = "all-MiniLM-L6-v2"
+        self.model_name = "voyage-large-2"
 
         # Ensure directory exists
         os.makedirs(os.path.dirname(self.index_path), exist_ok=True)
@@ -53,8 +53,25 @@ class RAGService:
 
     def _load_model(self):
         if self.model is None:
-            from sentence_transformers import SentenceTransformer
-            self.model = SentenceTransformer(self.model_name)
+            from app.services.voyage_embeddings import embed_texts, embed_query
+            self.model = VoyageEmbeddingModel(embed_texts, embed_query)
+
+class VoyageEmbeddingModel:
+    """Wrapper to make VoyageAI compatible with existing RAG service interface"""
+    def __init__(self, embed_texts_func, embed_query_func):
+        self.embed_texts = embed_texts_func
+        self.embed_query = embed_query_func
+    
+    def encode(self, texts):
+        """Encode single text or list of texts - compatible with sentence-transformers API"""
+        if isinstance(texts, str):
+            # Single text
+            return self.embed_query(texts)
+        elif isinstance(texts, list):
+            # List of texts
+            return self.embed_texts(texts)
+        else:
+            raise ValueError("Expected string or list of strings")
 
     def load(self):
         """Load existing index or create new one"""

@@ -645,27 +645,63 @@ class PitchDeckService:
             model = os.getenv("OLLAMA_MODEL", "llama3")
             print(f"Using Ollama model: {model}")
             
+            # Format revenue trajectory for display
+            revenue_data = extracted.get('revenue_data', [])
+            revenue_text = "No revenue trajectory data available"
+            if revenue_data:
+                revenue_lines = [f"- {r.get('year', 'N/A')}: ${r.get('revenue', 0):,.0f}" for r in revenue_data]
+                revenue_text = "\n".join(revenue_lines)
+            
             prompt = f"""You are a venture capital analyst reviewing a pitch deck for {company_name}.
 
-Pitch Deck Summary:
+## Pitch Deck Summary
 {extracted.get('summary', 'No summary available')}
 
-Key Metrics:
+## Key Metrics
 {json.dumps(extracted.get('key_metrics', {}), indent=2)}
 
-Founders: {', '.join(extracted.get('founders', []))}
-Industry: {extracted.get('industry', 'Unknown')}
-Stage: {extracted.get('stage', 'Unknown')}
+## Founders
+{', '.join(extracted.get('founders', []))}
 
-Please provide a concise investment analysis (300-500 words) covering:
-1. Business overview and value proposition
-2. Market opportunity and competitive landscape
-3. Team assessment
-4. Financial highlights
-5. Key strengths and potential concerns
-6. Investment recommendation (Pass/Consider/Strong Interest)
+## Industry & Stage
+- Industry: {extracted.get('industry', 'Unknown')}
+- Stage: {extracted.get('stage', 'Unknown')}
 
-Format as a professional VC memo."""
+## Revenue Trajectory (Extracted from Graphs)
+{revenue_text}
+
+## Analysis Requirements
+Provide a comprehensive investment analysis in professional VC memo format with these sections:
+
+### 1. Executive Summary
+Brief overview of the company and investment thesis (2-3 sentences)
+
+### 2. Business Overview
+- What the company does (value proposition)
+- Problem being solved
+- Solution and differentiation
+
+### 3. Market Opportunity
+- Total Addressable Market (TAM)
+- Competitive landscape
+- Market timing and trends
+
+### 4. Team Assessment
+- Founders' background and experience
+- Key team strengths and gaps
+
+### 5. Financial Analysis
+- Current metrics (revenue, growth, burn rate if available)
+- Revenue trajectory analysis from graphs
+- Unit economics and path to profitability
+- Funding requirements and use of funds
+
+### 6. Investment Recommendation
+Clear stance: **STRONG INTEREST / CONSIDER / PASS / PROCEED WITH CAUTION**
+
+Include 2-3 key risks or concerns and 2-3 key strengths.
+
+Format with proper Markdown headers (###) and bullet points. Keep to 400-600 words."""
 
             response = _call_ollama(prompt, model)
             if response:
@@ -743,6 +779,26 @@ The company is developing a solution in the {industry} space. Based on the extra
                 analysis += f"- **{key.title()}:** {value}\n"
         else:
             analysis += "- No specific metrics extracted from the pitch deck.\n"
+        
+        # Add revenue trajectory if available
+        revenue_data = extracted.get('revenue_data', [])
+        if revenue_data:
+            analysis += "\n### Revenue Trajectory (from Graphs)\n"
+            analysis += "| Year | Revenue |\n|------|---------|\n"
+            for r in revenue_data:
+                year = r.get('year', 'N/A')
+                rev = r.get('revenue', 0)
+                # Format revenue with appropriate unit
+                if rev >= 1000000000:
+                    rev_formatted = f"${rev/1000000000:.1f}B"
+                elif rev >= 1000000:
+                    rev_formatted = f"${rev/1000000:.1f}M"
+                elif rev >= 1000:
+                    rev_formatted = f"${rev/1000:.0f}K"
+                else:
+                    rev_formatted = f"${rev:,.0f}"
+                analysis += f"| {year} | {rev_formatted} |\n"
+            analysis += "\n*Revenue data extracted from pitch deck graphs. See visualization above.*\n"
         
         analysis += f"""
 ### Team Assessment

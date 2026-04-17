@@ -655,6 +655,11 @@ function renderGrowthTrendChart(pitchDeck) {
                 <circle cx="${p.x}" cy="${p.y}" r="4" fill="#00d4aa" stroke="#0a0e27" stroke-width="2" />
             `).join('')}
             
+            <!-- Data point value labels with units -->
+            ${points.map(p => `
+                <text x="${p.x}" y="${p.y - 10}" text-anchor="middle" fill="#00d4aa" font-size="9" font-weight="500">${formatCurrency(p.val)}</text>
+            `).join('')}
+            
             <!-- Labels -->
             ${yLabels}
             ${xLabels}
