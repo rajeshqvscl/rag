@@ -8,6 +8,7 @@ google-auth
 google-auth-oauthlib
 python-multipart
 pypdf
+pymupdf  # PyMuPDF for structured PDF extraction
 pdf2image
 pytesseract
 python-docx
@@ -30,3 +31,4 @@ sqlalchemy
 sec-edgar-downloader
 email-validator
 voyageai
+tiktoken  # For token counting in chunking

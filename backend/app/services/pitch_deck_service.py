@@ -7,10 +7,16 @@ import json
 from datetime import datetime
 from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
-import PyPDF2
-from pdf2image import convert_from_path
-import pytesseract
 import requests
+
+# Import structured PDF extractor
+try:
+    from app.services.pdf_extractor import pdf_extractor, TextChunk
+    STRUCTURED_EXTRACTION_AVAILABLE = True
+except ImportError as e:
+    print(f"Structured PDF extractor not available: {e}")
+    STRUCTURED_EXTRACTION_AVAILABLE = False
+    import PyPDF2
 
 # Check if Claude API is available
 ANTHROPIC_AVAILABLE = os.getenv("ANTHROPIC_API_KEY") is not None
@@ -96,59 +102,91 @@ class PitchDeckService:
         
         return file_path
     
-    def extract_pdf_text(self, file_path: str) -> Dict:
-        """Extract text content from PDF"""
+    def extract_pdf_text(self, file_path: str, file_name: str = "") -> Dict:
+        """Extract text content from PDF using structured extraction"""
         result = {
             "text": "",
             "pages": 0,
             "summary": "",
+            "company_name": None,  # NEW: Extracted company name
             "key_metrics": {},
             "founders": [],
             "team_size": None,
             "industry": None,
-            "stage": None
+            "stage": None,
+            "chunks": []  # NEW: Structured chunks with metadata
         }
         
+        # Get filename from path if not provided
+        if not file_name and file_path:
+            file_name = os.path.basename(file_path)
+        
         try:
-            with open(file_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
-                result["pages"] = len(pdf_reader.pages)
-                
-                # Extract text from all pages
-                full_text = ""
-                for page in pdf_reader.pages:
-                    try:
-                        text = page.extract_text()
-                        if text:
-                            full_text += text + "\n"
-                    except Exception as e:
-                        print(f"Error extracting text from page: {e}")
+            # Use structured extraction if available
+            if STRUCTURED_EXTRACTION_AVAILABLE:
+                print(f"Using structured PDF extraction (PyMuPDF) for {file_path}")
+                full_text, chunks, metadata = pdf_extractor.extract_pdf(file_path)
                 
                 result["text"] = full_text
+                result["pages"] = metadata.get("total_pages", len(chunks))
+                result["chunks"] = [
+                    {
+                        "text": c.text,
+                        "normalized_text": c.normalized_text,
+                        "slide": c.slide_number,
+                        "type": c.chunk_type,
+                        "page": c.page_number
+                    }
+                    for c in chunks
+                ]
                 
-                # Debug: Print first 500 chars of extracted text
-                print(f"PDF Pages: {result['pages']}")
-                print(f"Extracted text (first 500 chars): {full_text[:500]}")
-                print(f"Total text length: {len(full_text)}")
-                
-                # Extract structured information
-                result["key_metrics"] = self._extract_metrics(full_text)
-                result["founders"] = self._extract_founders(full_text)
-                result["team_size"] = self._extract_team_size(full_text)
-                result["industry"] = self._extract_industry(full_text)
-                result["stage"] = self._extract_funding_stage(full_text)
-                result["summary"] = self._generate_summary(full_text, result["key_metrics"])
-                
-                # Add estimated metrics if none found
-                result["key_metrics"] = self._add_estimated_metrics(result["key_metrics"], result["stage"], result["industry"])
-                
-                # Debug: print extracted metrics
-                print(f"Extracted metrics: {result['key_metrics']}")
-                
+                print(f"Structured extraction: {len(chunks)} chunks")
+                print(f"Chunk types: {metadata.get('chunk_types', {})}")
+            else:
+                # Fallback to basic extraction
+                print("Structured extractor not available, using fallback")
+                full_text, chunks, metadata = pdf_extractor._fallback_extraction(file_path) if STRUCTURED_EXTRACTION_AVAILABLE else self._basic_pdf_extract(file_path)
+                result["text"] = full_text
+                result["chunks"] = [{"text": c.text, "slide": c.slide_number, "type": c.chunk_type, "page": c.page_number} for c in chunks] if chunks else []
+            
+            # Debug output
+            print(f"PDF Pages: {result['pages']}")
+            print(f"Extracted text (first 500 chars): {result['text'][:500]}")
+            print(f"Total text length: {len(result['text'])}")
+            
+            # Extract structured information from normalized text (better for metrics)
+            normalized_full = " ".join([c.get("normalized_text", c.get("text", "")) for c in result["chunks"]]) if result["chunks"] else result["text"]
+            
+            result["key_metrics"] = self._extract_metrics(normalized_full)
+            result["founders"] = self._extract_founders(result["text"])
+            result["team_size"] = self._extract_team_size(result["text"])
+            result["industry"] = self._extract_industry(result["text"])
+            result["stage"] = self._extract_funding_stage(result["text"])
+            result["company_name"] = self._extract_company_name(result["text"], file_name)
+            result["summary"] = self._generate_summary(result["text"], result["key_metrics"])
+            
+            # Add estimated metrics if none found
+            result["key_metrics"] = self._add_estimated_metrics(result["key_metrics"], result["stage"], result["industry"])
+            
+            print(f"Extracted metrics: {result['key_metrics']}")
+            
         except Exception as e:
             print(f"Error extracting PDF content: {e}")
+            import traceback
+            print(traceback.format_exc())
         
         return result
+    
+    def _basic_pdf_extract(self, file_path: str):
+        """Basic PDF extraction fallback"""
+        import PyPDF2
+        full_text = ""
+        with open(file_path, 'rb') as file:
+            reader = PyPDF2.PdfReader(file)
+            for page in reader.pages:
+                text = page.extract_text() or ""
+                full_text += text + "\n"
+        return full_text, [], {"total_chunks": 0}
     
     def _extract_metrics(self, text: str) -> Dict:
         """Extract key business metrics from pitch deck text"""
@@ -615,6 +653,95 @@ class PitchDeckService:
         
         return None
     
+    def _extract_company_name(self, text: str, file_name: str = "") -> str:
+        """Extract company name from pitch deck text and filename"""
+        text_lower = text.lower()
+        
+        # Try to extract from filename first (often most reliable)
+        if file_name:
+            # Remove extension and normalize separators
+            clean_name = file_name.replace('.pdf', '').replace('_', ' ').replace('-', ' ').strip()
+            
+            # Split into words and remove common suffixes
+            words = clean_name.split()
+            suffixes_lower = ['pitch', 'deck', 'pitchdeck', 'presentation', 'final', 'draft']
+            
+            # Find the first suffix word and keep only words before it
+            cut_index = len(words)
+            for i, word in enumerate(words):
+                word_lower = word.lower()
+                # Check if word is a suffix (strip any trailing numbers)
+                word_base = re.sub(r'\d+$', '', word_lower)
+                if word_base in suffixes_lower:
+                    cut_index = i
+                    break
+                # Check for v1, v2 patterns
+                if re.match(r'^v\d+', word_lower):
+                    cut_index = i
+                    break
+                # Check for date patterns (8 digits like 20260417)
+                if re.match(r'^\d{8}$', word):
+                    cut_index = i
+                    break
+            
+            # Reconstruct name with only words before suffix
+            clean_name = ' '.join(words[:cut_index]).strip()
+            
+            # If we have a reasonable name from filename, use it
+            if len(clean_name) > 2 and len(clean_name) < 50:
+                return clean_name
+        
+        # Common patterns in pitch decks
+        patterns = [
+            # "Company Name - Pitch Deck" or "Company Name | Pitch Deck"
+            r'^([^\n\-|–—]+)\s*[\-|–—|]\s*(?:pitch\s*deck|presentation|deck)',
+            # "About Company Name" section
+            r'about\s+([A-Z][A-Za-z0-9\s&]+?)(?:\s|$|\.|:)',
+            # "Company Name is a..." in first paragraph
+            r'^([A-Z][A-Za-z0-9\s&]+?)\s+is\s+a\s+(?:\w+\s+)?(?:company|startup|platform|solution|service)',
+            # Title case company names on their own line (often logo/header)
+            r'\n([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\s*\n',
+            # "Welcome to Company Name"
+            r'welcome\s+to\s+([A-Z][A-Za-z0-9\s&]+?)(?:\s|$|!|\.)',
+            # "Meet the Team at Company Name"
+            r'(?:meet\s+the\s+team|team)\s+(?:at\s+|of\s+)?([A-Z][A-Za-z0-9\s&]+?)(?:\s|$|\.)',
+            # Domain pattern - extract from website mentions
+            r'(?:www\.|https?://)?([a-z0-9\-]+)\.(?:com|io|ai|co|app)',
+        ]
+        
+        # Get first 2000 chars (usually title slide and intro)
+        first_section = text[:2000]
+        
+        for pattern in patterns:
+            match = re.search(pattern, first_section, re.IGNORECASE | re.MULTILINE)
+            if match:
+                name = match.group(1).strip()
+                # Clean up the name
+                name = re.sub(r'\s+', ' ', name)  # normalize spaces
+                # Validate: should be 2-40 chars, not common words
+                common_words = ['the', 'and', 'for', 'our', 'this', 'we', 'us', 'your', 'about', 'meet', 'team', 'welcome']
+                if 2 <= len(name) <= 40 and name.lower() not in common_words:
+                    return name
+        
+        # Fallback: look for capitalized words that might be a company name
+        # in the first 500 chars
+        lines = text[:500].split('\n')
+        for line in lines:
+            line = line.strip()
+            # Look for short title-case lines (often company names)
+            if 2 <= len(line) <= 35 and line[0].isupper():
+                # Check if it's all caps or title case
+                words = line.split()
+                if len(words) >= 1 and len(words) <= 4:
+                    # Filter out lines that are mostly numbers or symbols
+                    if re.match(r'^[A-Za-z0-9\s&\.]+$', line):
+                        # Exclude common non-company lines
+                        exclude = ['confidential', 'proprietary', 'slide', 'page', 'agenda', 'outline', 'contents']
+                        if not any(exc in line.lower() for exc in exclude):
+                            return line
+        
+        return None
+    
     def _generate_summary(self, text: str, metrics: Dict) -> str:
         """Generate a brief summary of the pitch deck"""
         # Get first few sentences
@@ -636,7 +763,7 @@ class PitchDeckService:
         return summary[:500]  # Limit length
     
     def _generate_ai_analysis(self, extracted: Dict, company_name: str) -> str:
-        """Generate investment analysis using Ollama"""
+        """Generate investment analysis using Ollama with strict VC analyst prompt"""
         if not OLLAMA_AVAILABLE:
             print("Ollama not available, using fallback analysis")
             return self._generate_fallback_analysis(extracted, company_name)
@@ -645,63 +772,98 @@ class PitchDeckService:
             model = os.getenv("OLLAMA_MODEL", "llama3")
             print(f"Using Ollama model: {model}")
             
-            # Format revenue trajectory for display
+            # Build structured context from extracted data
+            key_metrics = extracted.get('key_metrics', {})
+            chunks = extracted.get('chunks', [])
+            
+            # Get financial chunks for richer context
+            financial_chunks = [c for c in chunks if c.get('type') == 'financials']
+            team_chunks = [c for c in chunks if c.get('type') == 'team']
+            market_chunks = [c for c in chunks if c.get('type') == 'market']
+            product_chunks = [c for c in chunks if c.get('type') == 'product']
+            
+            # Format revenue trajectory
             revenue_data = extracted.get('revenue_data', [])
             revenue_text = "No revenue trajectory data available"
             if revenue_data:
                 revenue_lines = [f"- {r.get('year', 'N/A')}: ${r.get('revenue', 0):,.0f}" for r in revenue_data]
                 revenue_text = "\n".join(revenue_lines)
             
-            prompt = f"""You are a venture capital analyst reviewing a pitch deck for {company_name}.
+            # Build structured context
+            context = {
+                "company_name": company_name,
+                "industry": extracted.get('industry', 'Unknown'),
+                "stage": extracted.get('stage', 'Unknown'),
+                "founders": extracted.get('founders', []),
+                "team_size": extracted.get('team_size'),
+                "revenue": key_metrics.get('revenue', 'Unknown'),
+                "growth": key_metrics.get('growth', 'Unknown'),
+                "users": key_metrics.get('users', 'Unknown'),
+                "tam": key_metrics.get('tam', 'Unknown'),
+                "raising": key_metrics.get('raising', 'Unknown'),
+                "valuation": key_metrics.get('valuation', 'Unknown'),
+                "runway": key_metrics.get('runway', 'Unknown'),
+                "revenue_trajectory": revenue_text,
+                "financial_excerpts": [c.get('normalized_text', c.get('text', ''))[:300] for c in financial_chunks[:2]],
+                "team_excerpts": [c.get('text', '')[:300] for c in team_chunks[:2]],
+                "market_excerpts": [c.get('text', '')[:300] for c in market_chunks[:2]],
+                "product_excerpts": [c.get('text', '')[:300] for c in product_chunks[:2]]
+            }
+            
+            prompt = f"""You are a venture capital analyst at a top-tier firm. You must be precise, skeptical, and data-driven.
 
-## Pitch Deck Summary
-{extracted.get('summary', 'No summary available')}
+STRICT INSTRUCTIONS:
+- IGNORE inconsistent or conflicting numbers - flag them explicitly
+- PRIORITIZE latest year data (2025-2026) over historical projections
+- If data is unclear, say "DATA INCONSISTENCY DETECTED" and explain why
+- Do NOT make optimistic assumptions - be conservative in projections
+- Flag any metrics that seem unrealistic for the stated stage
 
-## Key Metrics
-{json.dumps(extracted.get('key_metrics', {}), indent=2)}
+COMPANY CONTEXT:
+```json
+{json.dumps(context, indent=2, default=str)}
+```
 
-## Founders
-{', '.join(extracted.get('founders', []))}
+TASKS:
+1. Extract accurate financial metrics (use ONLY the provided numbers)
+2. Identify inconsistencies or data quality issues
+3. Summarize business model based on product/market excerpts
+4. Generate investor-ready insights with clear investment stance
 
-## Industry & Stage
-- Industry: {extracted.get('industry', 'Unknown')}
-- Stage: {extracted.get('stage', 'Unknown')}
+OUTPUT FORMAT (Markdown):
 
-## Revenue Trajectory (Extracted from Graphs)
-{revenue_text}
+### Executive Summary
+2-3 sentence investment thesis. State stage, sector, and primary opportunity/risk.
 
-## Analysis Requirements
-Provide a comprehensive investment analysis in professional VC memo format with these sections:
-
-### 1. Executive Summary
-Brief overview of the company and investment thesis (2-3 sentences)
-
-### 2. Business Overview
-- What the company does (value proposition)
+### Business Model
+- What they do (based on product excerpts)
 - Problem being solved
-- Solution and differentiation
+- Solution differentiation
 
-### 3. Market Opportunity
-- Total Addressable Market (TAM)
-- Competitive landscape
-- Market timing and trends
+### Financial Analysis
+- Current metrics (revenue, growth, burn if available)
+- Revenue trajectory assessment
+- Unit economics (if mentioned)
+- **Data Quality Issues:** [List any inconsistencies found]
 
-### 4. Team Assessment
-- Founders' background and experience
-- Key team strengths and gaps
+### Market & Team
+- TAM assessment
+- Competitive positioning
+- Founding team strength
 
-### 5. Financial Analysis
-- Current metrics (revenue, growth, burn rate if available)
-- Revenue trajectory analysis from graphs
-- Unit economics and path to profitability
-- Funding requirements and use of funds
+### Investment Recommendation
+**STANCE: [STRONG INTEREST / CONSIDER / PASS / PROCEED WITH CAUTION]**
 
-### 6. Investment Recommendation
-Clear stance: **STRONG INTEREST / CONSIDER / PASS / PROCEED WITH CAUTION**
+Key Strengths:
+- [2-3 specific strengths with evidence]
 
-Include 2-3 key risks or concerns and 2-3 key strengths.
+Key Risks:
+- [2-3 specific risks with evidence]
 
-Format with proper Markdown headers (###) and bullet points. Keep to 400-600 words."""
+Next Steps (if applicable):
+- [Specific questions to ask or data to verify]
+
+Keep to 400-600 words. Be skeptical. Flag bad data."""
 
             response = _call_ollama(prompt, model)
             if response:
@@ -716,29 +878,84 @@ Format with proper Markdown headers (###) and bullet points. Keep to 400-600 wor
             return self._generate_fallback_analysis(extracted, company_name)
     
     def _generate_email_draft(self, extracted: Dict, company_name: str) -> str:
-        """Generate outreach email draft using Claude AI"""
+        """Generate outreach email draft using Claude AI with structured context"""
         if not ANTHROPIC_AVAILABLE:
             return "Email draft not available. Claude API not configured."
         
         try:
             client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
             
-            prompt = f"""You are a venture capitalist writing an initial outreach email to {company_name}.
+            # Build structured context - this is key for personalized emails
+            key_metrics = extracted.get('key_metrics', {})
+            chunks = extracted.get('chunks', [])
+            
+            # Extract specific insights for personalization
+            financial_chunks = [c for c in chunks if c.get('type') == 'financials']
+            product_chunks = [c for c in chunks if c.get('type') == 'product']
+            market_chunks = [c for c in chunks if c.get('type') == 'market']
+            
+            # Get specific highlight from chunks
+            highlight_text = ""
+            if financial_chunks:
+                highlight_text = financial_chunks[0].get('normalized_text', financial_chunks[0].get('text', ''))[:200]
+            elif product_chunks:
+                highlight_text = product_chunks[0].get('text', '')[:200]
+            
+            # Build structured context
+            context = {
+                "company_name": company_name,
+                "industry": extracted.get('industry', 'Technology'),
+                "stage": extracted.get('stage', 'Early stage'),
+                "founders": extracted.get('founders', [])[:3],  # Top 3 founders
+                "revenue": key_metrics.get('revenue'),
+                "growth": key_metrics.get('growth'),
+                "users": key_metrics.get('users'),
+                "tam": key_metrics.get('tam'),
+                "raising": key_metrics.get('raising'),
+                "key_highlight": highlight_text,
+                "financial_excerpts": [c.get('normalized_text', c.get('text', ''))[:250] for c in financial_chunks[:1]],
+                "product_excerpts": [c.get('text', '')[:250] for c in product_chunks[:1]]
+            }
+            
+            prompt = f"""You are a venture capitalist writing a personalized outreach email.
 
-Company Info:
-- Industry: {extracted.get('industry', 'Technology')}
-- Stage: {extracted.get('stage', 'Early stage')}
-- Key Metrics: {json.dumps(extracted.get('key_metrics', {}), indent=2)}
-- Founders: {', '.join(extracted.get('founders', []))}
+STRICT INSTRUCTIONS:
+- Use ONLY the data provided below - do not invent metrics or claims
+- Reference 1-2 SPECIFIC data points that are actually in the context
+- If revenue or growth is impressive, mention it specifically
+- If product/market fit is evident from excerpts, reference that
+- NEVER use generic phrases like "I'm intrigued by your vision" without citing WHY
+- Keep to 150-200 words
+- Professional but conversational tone
 
-Write a concise, professional cold outreach email (150-250 words) that:
-1. Shows you've reviewed their pitch deck
-2. Expresses genuine interest in their business
-3. Mentions 1-2 specific points that caught your attention
-4. Proposes a next step (call/meeting)
-5. Includes a professional signature
+COMPANY DATA (use ONLY this data):
+```json
+{json.dumps(context, indent=2, default=str)}
+```
 
-The tone should be warm but professional, not overly salesy."""
+Write an email with this structure:
+
+Subject: [Specific reference to their business/sector] - [Firm Name]
+
+Hi [Founder names if available, otherwise "Team"],
+
+[Opening: One sentence showing you reviewed their pitch deck - cite SPECIFIC data point]
+
+[Body: One paragraph with 2-3 specific observations from the data above]
+
+[Ask: Propose 30-min call with calendar link placeholder]
+
+[Signature: Professional but warm]
+
+Rules:
+1. If revenue is >$1M or growth >50%, mention as impressive traction
+2. If TAM is large (>$1B), mention market opportunity
+3. If raising amount is specified, acknowledge their round
+4. If team has notable backgrounds, reference that
+5. Cite specific product/market details from excerpts
+6. Do NOT use vague/generic language - every sentence should reference actual data
+
+Output just the email subject and body."""
 
             response = client.messages.create(
                 model=os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022"),

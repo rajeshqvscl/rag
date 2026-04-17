@@ -8,7 +8,7 @@ class RAGService:
     def __init__(self, use_hnsw=True, hnsw_m=32, hnsw_ef_construction=200, hnsw_ef_search=128):
         """
         Initialize RAG Service with optional HNSW index
-        
+
         Args:
             use_hnsw: Use HNSW index instead of flat index (much faster for large datasets)
             hnsw_m: Number of connections per layer (higher = more accurate, slower build)
@@ -18,16 +18,32 @@ class RAGService:
         self.model = None
         self.index = None
         self.metadata = []
-        
+
         self.use_hnsw = use_hnsw
         self.hnsw_m = hnsw_m
         self.hnsw_ef_construction = hnsw_ef_construction
         self.hnsw_ef_search = hnsw_ef_search
-        self.vector_dim = 1536  # Dimension of voyage-large-2 embeddings
+
+        # Use local embeddings based on EMBEDDING_PROVIDER from .env
+        embedding_provider = os.getenv("EMBEDDING_PROVIDER", "local")
+        if embedding_provider == "voyage":
+            self.vector_dim = 1536  # Dimension of voyage-large-2 embeddings
+            self.model_name = "voyage-large-2"
+        else:
+            # Local sentence-transformers
+            model_name = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+            if "MiniLM" in model_name:
+                self.vector_dim = 384
+            elif "bge-small" in model_name:
+                self.vector_dim = 384
+            elif "mpnet-base" in model_name:
+                self.vector_dim = 768
+            else:
+                self.vector_dim = 384  # Default
+            self.model_name = model_name
 
         self.index_path = "app/data/faiss_index/index.faiss"
         self.meta_path = "app/data/faiss_index/meta.pkl"
-        self.model_name = "voyage-large-2"
 
         # Ensure directory exists
         os.makedirs(os.path.dirname(self.index_path), exist_ok=True)
@@ -53,8 +69,15 @@ class RAGService:
 
     def _load_model(self):
         if self.model is None:
-            from app.services.voyage_embeddings import embed_texts, embed_query
-            self.model = VoyageEmbeddingModel(embed_texts, embed_query)
+            embedding_provider = os.getenv("EMBEDDING_PROVIDER", "local")
+            if embedding_provider == "voyage":
+                from app.services.voyage_embeddings import embed_texts, embed_query
+                self.model = VoyageEmbeddingModel(embed_texts, embed_query)
+            else:
+                # Use local sentence-transformers
+                from sentence_transformers import SentenceTransformer
+                model = SentenceTransformer(self.model_name)
+                self.model = model
 
 class VoyageEmbeddingModel:
     """Wrapper to make VoyageAI compatible with existing RAG service interface"""

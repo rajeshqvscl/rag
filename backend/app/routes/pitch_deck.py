@@ -3,11 +3,30 @@ Pitch deck management routes
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from app.services.security_service import get_api_key
+from app.config.database import get_db
+from app.models.database import PitchDeck, User
+from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 import json
 import re
+from datetime import datetime
 
 router = APIRouter()
+
+def get_or_create_default_user(db: Session):
+    """Get or create default user for pitch decks"""
+    user = db.query(User).filter_by(username="default").first()
+    if not user:
+        user = User(
+            username="default",
+            email="default@finrag.com",
+            hashed_password="default",
+            full_name="Default User"
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user
 
 def generate_fallback_analysis(company_name: str, extracted: Dict, key_metrics: Dict, revenue_trajectory: list, text_content: str) -> str:
     """Generate detailed VC-style analysis using extracted data when Claude API is unavailable."""
@@ -43,14 +62,20 @@ def generate_fallback_analysis(company_name: str, extracted: Dict, key_metrics: 
     
     # Executive Summary
     sections.append(f"## Executive Summary\n\n")
-    sections.append(f"{company_name} is a {stage.lower()} stage company operating in the {industry} sector. ")
+    # Clean up stage text (avoid "growth stage stage")
+    stage_clean = stage.lower().replace(' stage', '').replace('stage ', '')
+    sections.append(f"{company_name} is a {stage_clean} stage company operating in the {industry} sector. ")
     sections.append(f"Based on the pitch deck analysis, the company presents a venture capital opportunity ")
     sections.append(f"that requires further evaluation. The document contains {pages} pages of business information.\n\n")
     
-    if 'electric' in text_content.lower() or 'ev' in text_content.lower():
+    # Add industry-specific context only if it aligns with detected industry
+    industry_lower = industry.lower()
+    text_lower = text_content.lower()
+    
+    if ('electric' in text_lower or 'ev' in text_lower or 'vehicle' in text_lower) and 'mobility' in industry_lower:
         sections.append(f"The company operates in the electric vehicle / sustainable mobility space, ")
         sections.append(f"targeting the growing clean transportation market.\n\n")
-    elif 'saas' in text_content.lower() or 'software' in text_content.lower():
+    elif ('saas' in text_lower or 'software' in text_lower or 'platform' in text_lower) and ('saas' in industry_lower or 'software' in industry_lower or 'fintech' in industry_lower):
         sections.append(f"The company operates a SaaS/platform business model with software-driven solutions.\n\n")
     
     # Key Metrics
@@ -123,7 +148,7 @@ def generate_fallback_analysis(company_name: str, extracted: Dict, key_metrics: 
     
     if risks:
         for i, risk in enumerate(risks[:6], 1):
-            sections.append(f"{i}. {risk}\n")
+            sections.append(f"{i}. {risk}  \n")  # Two spaces for line break
     else:
         sections.append(f"1. **Market Risk:** Unproven market demand at scale\n")
         sections.append(f"2. **Execution Risk:** Team ability to execute growth plans\n")
@@ -145,21 +170,33 @@ def generate_fallback_analysis(company_name: str, extracted: Dict, key_metrics: 
     
     # Growth Projections
     if revenue_trajectory:
-        sections.append(f"### Growth Projections\n")
-        sections.append(f"| Year | Projected Revenue |\n")
-        sections.append(f"|------|-------------------|\n")
+        sections.append(f"### Revenue Projections\n")
+        sections.append(f"| Year | Revenue |\n")
+        sections.append(f"|------|---------|\n")
         for item in revenue_trajectory:
             year = item.get('year', 'N/A')
             rev = item.get('revenue', 0)
-            if rev >= 1000000000:
-                rev_str = f"${rev/1000000000:.1f}B"
-            elif rev >= 1000000:
-                rev_str = f"${rev/1000000:.1f}M"
-            elif rev >= 1000:
-                rev_str = f"${rev/1000:.1f}K"
-            else:
-                rev_str = f"${rev}"
-            sections.append(f"| {year} | {rev_str} |\n")
+            
+            # Handle edge cases
+            if rev is None or rev == 0:
+                continue
+            
+            # Format with appropriate unit
+            try:
+                rev = float(rev)
+                if rev >= 1000000000:
+                    rev_str = f"${rev/1000000000:.1f}B"
+                elif rev >= 1000000:
+                    rev_str = f"${rev/1000000:.1f}M"
+                elif rev >= 1000:
+                    rev_str = f"${rev/1000:.0f}K"
+                elif rev >= 1:
+                    rev_str = f"${rev:,.0f}"
+                else:
+                    continue  # Skip invalid values
+                sections.append(f"| {year} | {rev_str} |\n")
+            except (ValueError, TypeError):
+                continue  # Skip malformed data
         sections.append(f"\n")
     
     # Unit Economics
@@ -200,22 +237,47 @@ def generate_fallback_analysis(company_name: str, extracted: Dict, key_metrics: 
         sections.append(f"4. **Follow-on Review:** Re-assess after 6-12 months of progress\n")
     
     sections.append(f"\n---\n\n")
-    sections.append(f"*This analysis was generated using AI-powered document extraction and semantic analysis via the sentence-transformers/all-MiniLM-L6-v2 model. ")
-    sections.append(f"The system extracted key metrics, identified business patterns, and generated investment insights using embeddings-based natural language understanding.*")
+    sections.append(f"*This analysis was generated using AI-powered document extraction with **Voyage AI voyage-large-2** embeddings (1536-dim). ")
+    sections.append(f"The system uses structured PDF extraction with PyMuPDF, intelligent chunking, and semantic analysis to extract key metrics and generate investment insights.*")
     
     return "".join(sections)
 
 @router.get("/pitch-decks")
 def get_pitch_decks(
     limit: int = 10,
+    db: Session = Depends(get_db),
     api_key: str = Depends(get_api_key)
 ):
-    """Get all pitch decks"""
+    """Get all pitch decks from database"""
     try:
+        user = get_or_create_default_user(db)
+        
+        pitch_decks = db.query(PitchDeck).filter(
+            PitchDeck.user_id == user.id
+        ).order_by(PitchDeck.uploaded_at.desc()).limit(limit).all()
+        
+        result = []
+        for deck in pitch_decks:
+            result.append({
+                "id": deck.id,
+                "company_name": deck.company_name,
+                "file_name": deck.file_name,
+                "industry": deck.industry,
+                "stage": deck.stage,
+                "confidence": deck.funding_stage or "High",
+                "date_uploaded": deck.uploaded_at.strftime("%Y-%m-%d %H:%M:%S") if deck.uploaded_at else None,
+                "pages": deck.pdf_pages,
+                "key_metrics": deck.key_metrics or {},
+                "revenue_data": deck.revenue_data or [],
+                "analysis": deck.analysis,
+                "email_draft": deck.email_draft,
+                "status": deck.status
+            })
+        
         return {
             "status": "success",
-            "pitch_decks": [],
-            "total": 0
+            "pitch_decks": result,
+            "total": len(result)
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -240,18 +302,55 @@ def create_pitch_deck(
 @router.get("/pitch-decks/{pitch_deck_id}")
 def get_pitch_deck(
     pitch_deck_id: str,
+    db: Session = Depends(get_db),
     api_key: str = Depends(get_api_key)
 ):
-    """Get a specific pitch deck"""
+    """Get a specific pitch deck with full analysis"""
     try:
+        user = get_or_create_default_user(db)
+        
+        # Try to fetch by ID (integer) or return 404
+        try:
+            deck_id = int(pitch_deck_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid pitch deck ID")
+        
+        deck = db.query(PitchDeck).filter(
+            PitchDeck.id == deck_id,
+            PitchDeck.user_id == user.id
+        ).first()
+        
+        if not deck:
+            raise HTTPException(status_code=404, detail="Pitch deck not found")
+        
+        # Update last viewed timestamp
+        deck.last_viewed_at = datetime.utcnow()
+        db.commit()
+        
         return {
             "status": "success",
             "pitch_deck": {
-                "id": pitch_deck_id,
-                "company": "Example Company",
-                "title": "Pitch Deck"
+                "id": deck.id,
+                "company_name": deck.company_name,
+                "company": deck.company_name,
+                "file_name": deck.file_name,
+                "file_path": deck.file_path,
+                "industry": deck.industry,
+                "stage": deck.stage,
+                "pages": deck.pdf_pages,
+                "key_metrics": deck.key_metrics or {},
+                "revenue_data": deck.revenue_data or [],
+                "analysis": deck.analysis or "No analysis available",
+                "email_draft": deck.email_draft or "No email draft available",
+                "founders": deck.founders or [],
+                "team_size": deck.team_size,
+                "date_uploaded": deck.uploaded_at.strftime("%Y-%m-%d %H:%M:%S") if deck.uploaded_at else None,
+                "confidence": deck.funding_stage or "High",
+                "status": deck.status
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -259,6 +358,7 @@ def get_pitch_deck(
 async def upload_pitch_deck(
     file: UploadFile = File(...),
     company: str = "",
+    db: Session = Depends(get_db),
     api_key: str = Depends(get_api_key)
 ):
     """Upload a pitch deck file with detailed AI analysis"""
@@ -268,21 +368,37 @@ async def upload_pitch_deck(
         import hashlib
         
         pitch_deck_service = PitchDeckService()
+        user = get_or_create_default_user(db)
         
         # Read file content
         file_content = await file.read()
         file_name = file.filename if file else "unknown.pdf"
-        company_name = company or "Unknown Company"
         
         # Generate unique ID based on file content
         file_hash = hashlib.md5(file_content).hexdigest()[:12]
         unique_id = f"pd_{file_hash}"
         
-        # Save the PDF file
-        file_path = pitch_deck_service.save_pdf(file_content, file_name, company_name)
+        # Save the PDF file (use filename as temp company name)
+        temp_company = company or "Unknown Company"
+        file_path = pitch_deck_service.save_pdf(file_content, file_name, temp_company)
         
-        # Extract text and metrics from PDF
-        extracted = pitch_deck_service.extract_pdf_text(file_path)
+        # Extract text and metrics from PDF (including company name)
+        extracted = pitch_deck_service.extract_pdf_text(file_path, file_name)
+        
+        # Use extracted company name, fallback to form input, then to filename-based name
+        extracted_company = extracted.get('company_name')
+        if extracted_company and extracted_company != "Unknown Company":
+            company_name = extracted_company
+            print(f"Using extracted company name: {company_name}")
+        elif company and company != "Unknown Company":
+            company_name = company
+            print(f"Using form company name: {company_name}")
+        else:
+            # Try to clean up filename
+            clean_name = file_name.replace('.pdf', '').replace('_', ' ').replace('-', ' ')
+            clean_name = re.sub(r'\s*(pitch deck|pitchdeck|presentation|deck|final|draft)\s*\d*$', '', clean_name, flags=re.IGNORECASE)
+            company_name = clean_name.strip() or "Unknown Company"
+            print(f"Using filename-based company name: {company_name}")
         
         # Get extracted metrics
         key_metrics = extracted.get('key_metrics', {})
@@ -341,23 +457,49 @@ async def upload_pitch_deck(
                 print(f"Error generating revenue projections: {e}")
                 pass
         
-        # Generate embeddings for semantic analysis using all-MiniLM model
+        # Generate embeddings for semantic analysis using structured chunks
         try:
-            text_chunks = [text_content[i:i+500] for i in range(0, min(len(text_content), 2000), 500)]
-            if text_chunks:
-                embeddings = [get_embedding(chunk) for chunk in text_chunks[:3]]
-                semantic_summary = f"Analyzed {len(embeddings)} document sections using sentence-transformers/all-MiniLM-L6-v2 model"
-                print(f"Generated {len(embeddings)} embeddings for semantic analysis")
+            # Use normalized chunks if available (better for financial data)
+            structured_chunks = extracted.get('chunks', [])
+            if structured_chunks:
+                # Prioritize financial chunks, then product/market
+                priority_types = ['financials', 'product', 'market', 'team', 'general']
+                sorted_chunks = sorted(
+                    structured_chunks,
+                    key=lambda c: priority_types.index(c.get('type', 'general')) if c.get('type') in priority_types else 99
+                )
+                
+                # Use normalized text for financial chunks, regular text for others
+                chunk_texts = []
+                for c in sorted_chunks[:5]:  # Top 5 most relevant chunks
+                    text = c.get('normalized_text', c.get('text', ''))
+                    if text:
+                        chunk_texts.append(text[:500])  # Limit length for embedding
+                
+                if chunk_texts:
+                    embeddings = [get_embedding(chunk) for chunk in chunk_texts]
+                    semantic_summary = f"Analyzed {len(embeddings)} structured sections (financials/product/market)"
+                    print(f"Generated {len(embeddings)} embeddings from structured chunks")
+                else:
+                    semantic_summary = "No structured content available"
             else:
-                semantic_summary = "No text content available for semantic analysis"
+                # Fallback: use normalized text chunks
+                text_chunks = [text_content[i:i+500] for i in range(0, min(len(text_content), 2000), 500)]
+                if text_chunks:
+                    embeddings = [get_embedding(chunk) for chunk in text_chunks[:3]]
+                    semantic_summary = f"Analyzed {len(embeddings)} document sections using fallback chunking"
+                else:
+                    semantic_summary = "No text content available"
         except Exception as e:
             semantic_summary = f"Semantic analysis unavailable: {str(e)}"
             print(f"Embedding generation error: {e}")
         
-        # Generate detailed VC-style analysis using all-MiniLM embeddings and extracted data
-        print(f"Generating detailed VC analysis for {company_name} using all-MiniLM model...")
-        analysis_markdown = generate_fallback_analysis(company_name, extracted, key_metrics, revenue_trajectory, text_content)
-        
+        # Generate detailed VC-style analysis using Claude Sonnet 4
+        print(f"Generating detailed VC analysis for {company_name} using Claude Sonnet 4...")
+        from app.services.claude_service import analyze_pitch_deck_detailed
+        claude_result = analyze_pitch_deck_detailed(text_content, company_name, key_metrics)
+        analysis_markdown = claude_result.get('detailed_analysis', '')
+
         # Add analysis metadata section (frontend handles main title)
         analysis_header = f"""**Analysis Metadata:**
 - **Company:** {company_name}
@@ -365,8 +507,7 @@ async def upload_pitch_deck(
 - **Stage:** {extracted.get('stage', 'Early Stage')}
 - **Document Pages:** {extracted.get('pages', 0)}
 - **Analysis ID:** {unique_id}
-- **Analysis Method:** sentence-transformers/all-MiniLM-L6-v2 model (embeddings-based semantic analysis)
-- **Semantic Summary:** {semantic_summary}
+- **Analysis Method:** Claude Sonnet 4 (claude-sonnet-4-20250514) - AI-powered VC analysis
 
 ---
 
@@ -411,17 +552,41 @@ Best regards,
 
 P.S. If you have any questions ahead of our call, feel free to reply to this email or reach me directly at [Phone]."""
         
+        # Save to database
+        pitch_deck = PitchDeck(
+            user_id=user.id,
+            company_name=company_name,
+            file_name=file_name,
+            file_path=file_path,
+            file_size=len(file_content),
+            pdf_pages=extracted.get('pages', 0),
+            industry=extracted.get('industry'),
+            stage=extracted.get('stage'),
+            extracted_text=text_content[:5000],  # Store preview
+            key_metrics=key_metrics,
+            revenue_data=revenue_trajectory,
+            analysis=analysis_markdown,
+            email_draft=email_draft,
+            founders=extracted.get('founders', []),
+            team_size=extracted.get('team_size'),
+            status="new",
+            priority="medium"
+        )
+        db.add(pitch_deck)
+        db.commit()
+        db.refresh(pitch_deck)
+        
         return {
             "status": "success",
             "pitch_deck": {
-                "id": unique_id,
+                "id": pitch_deck.id,
                 "company": company_name,
                 "company_name": company_name,
                 "file_name": file_name,
                 "analysis": analysis_markdown,
                 "email_draft": email_draft,
                 "revenue_data": revenue_trajectory,
-                "date_uploaded": "2026-04-16",
+                "date_uploaded": pitch_deck.uploaded_at.strftime("%Y-%m-%d %H:%M:%S") if pitch_deck.uploaded_at else datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
                 "confidence": "High",
                 "file_path": file_path,
                 "pages": extracted.get('pages', 0),

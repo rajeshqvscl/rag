@@ -13,9 +13,9 @@ def _get_voyage_client():
     global _vo_client
     if _vo_client is None:
         import voyageai
-        api_key = os.getenv("VOYAGE_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+        api_key = os.getenv("VOYAGE_API_KEY")
         if not api_key:
-            raise ValueError("VOYAGE_API_KEY or ANTHROPIC_API_KEY not set")
+            raise ValueError("VOYAGE_API_KEY not set. Get your API key from https://dash.voyageai.com/")
         _vo_client = voyageai.Client(api_key=api_key)
     return _vo_client
 

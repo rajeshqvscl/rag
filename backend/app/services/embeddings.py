@@ -1,12 +1,12 @@
 """
-Embedding service - now defaults to Voyage AI (voyage-large-2)
-Fallback to sentence-transformers if Voyage not available
+Embedding service - defaults to local sentence-transformers
+Can use Voyage AI if configured
 """
 import os
 import numpy as np
 
-# Use Voyage by default, fallback to sentence-transformers
-EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "voyage")
+# Use local by default, can override to voyage
+EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "local")
 
 def get_embedding(text: str):
     """Get single embedding"""
