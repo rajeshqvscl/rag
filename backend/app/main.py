@@ -3,7 +3,13 @@ import os
 from dotenv import load_dotenv
 
 # Load environment variables FIRST before any imports
-load_dotenv()
+# Try Render's secret files location first, then local .env
+if os.path.exists('/etc/secrets/.env'):
+    load_dotenv('/etc/secrets/.env')
+    print("Loaded .env from /etc/secrets/.env")
+else:
+    load_dotenv()
+    print("Loaded .env from local directory")
 
 # Fix Windows encoding issues
 if sys.platform == 'win32':
