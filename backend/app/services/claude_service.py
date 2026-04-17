@@ -4,25 +4,28 @@ import os
 import re
 import time
 
-# Use API key directly
-api_key = "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"
-if not api_key:
-    raise ValueError("ANTHROPIC_API_KEY not set")
-
-# Try different initialization methods for compatibility
-try:
-    client = Anthropic(api_key=api_key)
-except Exception as e:
-    print(f"Anthropic client init error: {e}")
-    # Fallback for newer API versions
-    client = Anthropic(api_key=api_key, default_headers={"anthropic-version": "2023-06-01"})
+# Lazy load client to reduce startup memory
+_client = None
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
+
+def _get_client():
+    global _client
+    if _client is None:
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise ValueError("ANTHROPIC_API_KEY not set")
+        try:
+            _client = Anthropic(api_key=api_key)
+        except Exception as e:
+            print(f"Anthropic client init error: {e}")
+            _client = Anthropic(api_key=api_key, default_headers={"anthropic-version": "2023-06-01"})
+    return _client
 
 def call_claude_with_retry(messages, max_tokens=300, max_retries=6, retry_delay=3):
     """Call Claude API with retry logic for transient errors"""
     for attempt in range(max_retries):
         try:
-            response = client.messages.create(
+            response = _get_client().messages.create(
                 model=DEFAULT_MODEL,
                 max_tokens=max_tokens,
                 messages=messages
@@ -567,3 +570,15 @@ Please review the analysis summary and follow up as needed.
 
 Best regards,
 FinRAG System"""
+
+# Lazy client proxy for import compatibility
+class _ClientProxy:
+    """Proxy that lazy-loads the Anthropic client on first access."""
+    _real_client = None
+    
+    def __getattr__(self, name):
+        if self._real_client is None:
+            self._real_client = _get_client()
+        return getattr(self._real_client, name)
+
+client = _ClientProxy()
