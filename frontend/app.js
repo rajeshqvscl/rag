@@ -959,7 +959,7 @@ async function loadDrafts() {
             });
             
         } else {
-            console.log('CONDITION FAILED - hasStatus:' + hasStatus + ', hasDrafts:' + hasDrafts);
+            console.log('No drafts - status: ' + data.status + ', drafts count: ' + drafts.length);
             draftsList.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">No drafts yet. Analyze pitch decks in the Revert Analysis tab to create drafts.</div>';
         }
         
