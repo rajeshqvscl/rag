@@ -28,3 +28,4 @@ itsdangerous
 psycopg2-binary
 sqlalchemy
 sec-edgar-downloader
+email-validator
