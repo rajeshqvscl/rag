@@ -26,3 +26,4 @@ passlib[bcrypt]
 authlib
 itsdangerous
 psycopg2-binary
+sqlalchemy
