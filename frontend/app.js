@@ -478,14 +478,37 @@ function renderGrowthTrendChart(pitchDeck) {
     
     console.log('Revenue data from graphs:', revenueData);
     
+    // Detect unit from metrics.revenue (e.g., "$5M" → "M", "$2B" → "B")
+    let graphUnit = '';
+    const revStr = metrics.revenue || metrics.arr || metrics.mrr || '';
+    if (revStr) {
+        const unitMatch = revStr.match(/[KMB]$/i);
+        if (unitMatch) {
+            graphUnit = unitMatch[0].toUpperCase();
+            console.log('Detected graph unit from metrics:', graphUnit);
+        }
+    }
+    
     // Use extracted graph data if available, otherwise fall back to estimates
     let years, values;
     
     if (revenueData && revenueData.length > 0) {
         // Use actual revenue trajectory data extracted from graphs
         years = revenueData.map(d => d.year);
-        values = revenueData.map(d => d.revenue);
-        console.log('Using extracted graph data:', years, values);
+        values = revenueData.map(d => {
+            // If graph values are small numbers but metrics show M/B units,
+            // multiply values accordingly
+            let val = d.revenue;
+            if (graphUnit === 'M' && val < 1000000) {
+                val = val * 1000000;
+            } else if (graphUnit === 'B' && val < 1000000000) {
+                val = val * 1000000000;
+            } else if (graphUnit === 'K' && val < 1000) {
+                val = val * 1000;
+            }
+            return val;
+        });
+        console.log('Using extracted graph data with unit scaling:', years, values, 'Unit:', graphUnit);
     } else {
         // Generate projected revenue data (2026-2031) based on estimates
         years = ['2026', '2027', '2028', '2029', '2030', '2031'];
@@ -585,9 +608,23 @@ function renderGrowthTrendChart(pitchDeck) {
         return `<text x="${padding.left - 10}" y="${y + 4}" text-anchor="end" fill="rgba(255,255,255,0.5)" font-size="10">${formatCurrency(val)}</text>`;
     }).join('');
     
-    // X-axis labels
+    // X-axis labels - format years nicely
+    const formatYear = (year) => {
+        // If year is a single digit or starts with 0 (like '1', '02', '03'), format as "Year X"
+        if (/^\d{1,2}$/.test(year) || /^0\d$/.test(year)) {
+            const yearNum = parseInt(year, 10);
+            return `Y${yearNum}`;
+        }
+        // If it's a 4-digit year, show last 2 digits (e.g., "2024" → "24")
+        if (/^\d{4}$/.test(year)) {
+            return year.slice(-2);
+        }
+        return year;
+    };
+    
     const xLabels = points.map(p => {
-        return `<text x="${p.x}" y="${padding.top + chartHeight + 20}" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="10">${p.year}</text>`;
+        const label = formatYear(p.year);
+        return `<text x="${p.x}" y="${padding.top + chartHeight + 20}" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="10">${label}</text>`;
     }).join('');
     
     // Grid lines
