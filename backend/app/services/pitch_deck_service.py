@@ -74,6 +74,73 @@ def _call_ollama(prompt: str, model: str = "llama3") -> str:
         return None
 
 
+import re
+from collections import defaultdict
+
+def classify_block(text):
+    if "|" in text:
+        return "table"
+    elif "revenue" in text.lower():
+        return "financial"
+    else:
+        return "other"
+
+def parse_money(val_str):
+    """Safely parse numbers including K/M/B suffixes and decimals."""
+    v_str = val_str.lower().replace("$", "").replace(",", "").strip()
+    if not v_str:
+        return None
+    multiplier = 1
+    if "k" in v_str:
+        multiplier = 1e3
+        v_str = v_str.replace("k", "")
+    elif "m" in v_str:
+        multiplier = 1e6
+        v_str = v_str.replace("m", "")
+    elif "b" in v_str:
+        multiplier = 1e9
+        v_str = v_str.replace("b", "")
+    try:
+        return float(v_str) * multiplier
+    except ValueError:
+        return None
+
+def extract_text_revenue(chunks):
+    best = None
+    for ch in chunks:
+        if "revenue" in ch.lower() or "arr" in ch.lower():
+            # Catch decimals, commas, and suffixes (e.g. $2.5M, $500K, 2,000,000)
+            nums = re.findall(r"\$?\s*[\d,]+(?:\.\d+)?\s*(?:[kmbKMB])?", ch)
+            for n in nums:
+                val = parse_money(n)
+                if val is not None:
+                    # keep realistic startup ranges
+                    if 1e4 <= val < 1e9:
+                        best = max(best or 0, val)
+    return best
+
+def is_graph_noise(v):
+    return v < 1000   # all ticks like 20, 25, 27 die here
+
+def parse_and_validate_table(text):
+    rows = []
+    for line in text.split("\n"):
+        if "|" in line:
+            parts = [p.strip() for p in line.split("|") if p.strip()]
+            if len(parts) == 2 and parts[0].isdigit():
+                year = int(parts[0])
+                val = parse_money(parts[1])
+                
+                if val is None:
+                    continue
+                
+                # reject tiny values (likely ticks or scaled)
+                if is_graph_noise(val):
+                    return []   # entire table is unreliable
+                    
+                rows.append((year, val))
+    return rows
+
 class PitchDeckService:
     """Service for managing pitch deck PDFs"""
     
@@ -159,7 +226,7 @@ class PitchDeckService:
             text_for_analysis = result["text"] or ""
             normalized_full = " ".join([c.get("normalized_text", c.get("text", "")) or "" for c in result["chunks"]]) if result["chunks"] else text_for_analysis
             
-            result["key_metrics"] = self._extract_metrics(normalized_full)
+            result["key_metrics"] = self._extract_metrics(normalized_full, file_path)
             result["founders"] = self._extract_founders(text_for_analysis)
             result["team_size"] = self._extract_team_size(text_for_analysis)
             result["industry"] = self._extract_industry(text_for_analysis)
@@ -189,295 +256,97 @@ class PitchDeckService:
                 text = page.extract_text() or ""  # ← safe guard
                 full_text += text + "\n"
         return full_text, [], {"total_chunks": 0}
-    
-    def _extract_metrics(self, text: str) -> Dict:
-        """Extract key business metrics from pitch deck text"""
-        metrics = {}
-        text_lower = text.lower()
-        
-        # Revenue patterns - comprehensive, avoid small numbers
-        revenue_patterns = [
-            r'revenue[:\s-]*(?:of\s*|is\s*|was\s*)?(\$[\d,.]+\s*[MBK]?)',
-            r'(\$[\d,.]+\s*[MBK]?)\s*(?:in\s*)?(?:annual\s*)?revenue',
-            r'annual\s*revenue[:\s-]*(\$[\d,.]+\s*[MBK]?)',
-            r'ar[rk]\s*(?:of\s*|is\s*)?(\$[\d,.]+\s*[MBK]?)',
-            r'(\$[\d,.]+\s*[MBK]?)\s*arr',
-            r'(\$[\d,.]+\s*[MBK]?)\s*mrr',
-            r'revenue\s*generated[:\s-]*(\$[\d,.]+\s*[MBK]?)',
-            r'total\s*revenue[:\s-]*(\$[\d,.]+\s*[MBK]?)',
-            r'current\s*revenue[:\s-]*(\$[\d,.]+\s*[MBK]?)',
-            r'achieved\s*(\$[\d,.]+\s*[MBK]?)\s*in\s*revenue',
-            r'(?:monthly|annual)\s*(?:revenue|income|sales)[:\s-]*(\$[\d,.]+\s*[MBK]?)',
-            r'(?:gross|net)\s*revenue[:\s-]*(\$[\d,.]+\s*[MBK]?)',
-        ]
-        for pattern in revenue_patterns:
-            match = re.search(pattern, text_lower)
-            if match:
-                revenue_str = match.group(1).strip()
-                # Parse and validate revenue - reject very small values
-                rev_match = re.search(r'\$?([\d,.]+)\s*([MBK]?)', revenue_str, re.IGNORECASE)
-                if rev_match:
-                    num = float(rev_match[1].replace(',', ''))
-                    unit = rev_match[2].upper()
-                    
-                    # Convert to actual number
-                    if unit == 'B':
-                        actual_revenue = num * 1000000000
-                    elif unit == 'M':
-                        actual_revenue = num * 1000000
-                    elif unit == 'K':
-                        actual_revenue = num * 1000
-                    else:
-                        actual_revenue = num
-                    
-                    # Only accept if revenue is reasonable (at least $10K)
-                    if actual_revenue >= 10000:
-                        metrics['revenue'] = revenue_str
-                        break
-                    else:
-                        print(f"Rejected unrealistic revenue value: {revenue_str} (too small)")
-                else:
-                    metrics['revenue'] = revenue_str
-                    break
-        
-        # Fallback: Look for revenue in first 2000 chars (usually in summary/financial section)
-        if 'revenue' not in metrics:
-            # Look for patterns like "Financial Highlights" followed by revenue
-            financial_section = text_lower[:2000]
-            fallback_patterns = [
-                r'(?:financial|highlights|metrics|traction)[:\s\n]*.*?revenue[:\s\n]*(\$[\d,.]+\s*[MBK]?)',
-                r'(?:revenue|sales)[:\s\n]*(\$[\d,.]+\s*[MBK]?)',
-                r'(?:annual|recurring)\s+(?:revenue|income)[:\s\n]*(\$[\d,.]+\s*[MBK]?)',
-            ]
-            for pattern in fallback_patterns:
-                match = re.search(pattern, financial_section)
-                if match:
-                    metrics['revenue'] = match.group(1).strip()
-                    break
-        
+    def _extract_table_chunks(self, file_path: str) -> list:
+        chunks = []
+        if not file_path:
+            return chunks
+        try:
+            import pdfplumber
+            with pdfplumber.open(file_path) as pdf:
+                for page in pdf.pages:
+                    tables = page.extract_tables()
+                    for table in tables:
+                        for row in table:
+                            if not row: continue
+                            text_val = " | ".join(str(c).strip() for c in row if c)
+                            if text_val:
+                                chunks.append(text_val)
+        except Exception as e:
+            print(f"Table extraction skip: {e}")
+        return chunks
 
+    def _extract_metrics(self, text: str, file_path: str = None) -> dict:
+        """Extract key business metrics using validation parsing"""
+        metrics = {}
+        if not text:
+            return metrics
+            
+        text_chunks = text.split('\n')
+        table_chunks = self._extract_table_chunks(file_path)
+        revenue = extract_text_revenue(text_chunks)
         
-        # Fallback 2: Look for any dollar amount with M/B/K near "revenue"
-        if 'revenue' not in metrics:
-            # Find all $X.XM patterns near the word revenue
-            broad_pattern = r'(?:^|[\s\n])(\$[\d,.]+[MBK])[^.]{0,30}revenue|revenue[^.]{0,30}(\$[\d,.]+[MBK])'
-            match = re.search(broad_pattern, text_lower)
-            if match:
-                metrics['revenue'] = (match.group(1) or match.group(2)).strip()
+        if not revenue:
+            revenue_display = "Unavailable"
+        else:
+            if revenue >= 1e9:
+                revenue_display = f"${revenue/1e9:,.1f}B"
+            elif revenue >= 1e6:
+                revenue_display = f"${revenue/1e6:,.0f}M"
+            else:
+                revenue_display = f"${revenue:,.0f}"
         
-        # Fallback 3: Table formats (pipe, tab, or space separated)
-        if 'revenue' not in metrics:
-            table_patterns = [
-                r'revenue\s*[|\t]\s*(\$[\d,.]+[MBK]?)',
-                r'revenue\s{2,}(\$[\d,.]+[MBK]?)',
-                r'\|\s*revenue\s*\|\s*(\$[\d,.]+[MBK]?)',
-            ]
-            for pattern in table_patterns:
-                match = re.search(pattern, text_lower)
-                if match:
-                    metrics['revenue'] = match.group(1).strip()
-                    break
+        metrics["revenue"] = revenue_display
+        metrics["growth"] = "Unavailable"
+        metrics["tam"] = "Unavailable"
+        metrics["users"] = "Unavailable"
         
-        # Fallback 4: Look in first 500 chars (often on title/key metrics slide)
-        if 'revenue' not in metrics:
-            first_section = text_lower[:500]
-            # Look for any dollar amount that might be revenue
-            rev_in_first = re.search(r'(\$[\d,.]+[MB])', first_section)
-            if rev_in_first:
-                # Only use if it looks like a revenue number (millions+ and near other business terms)
-                candidate = rev_in_first.group(1)
-                if any(term in first_section for term in ['revenue', 'sales', 'income', 'financial', 'traction', 'mrr', 'arr']):
-                    metrics['revenue'] = candidate.strip()
-        
-        # Growth rate
-        growth_patterns = [
-            r'(\d+)%\s*(?:yoy|year\s*over\s*year|annual)\s*growth',
-            r'growth\s*rate\s*(?:of\s*)?(\d+)%',
-            r'growing\s*(?:at\s*)?(\d+)%',
-            r'(\d+)x\s*growth',
-            r'(\d+)%\s*mom|month\s*over\s*month',
-        ]
-        for pattern in growth_patterns:
-            match = re.search(pattern, text_lower)
-            if match:
-                metrics['growth'] = f"{match.group(1)}%"
-                break
-        
-        # Users/Customers — require K/M/B suffix OR at least 4 raw digits
-        # NOTE: run on original text, not normalized (normalized expands 2B → 2,000,000,000)
-        user_patterns = [
-            r'(\d+(?:\.\d+)?[KMB])\s*(?:active\s*)?users',
-            r'(\d+(?:\.\d+)?[KMB])\s*customers',
-            r'(\d+(?:\.\d+)?[KMB])\s*subscribers',
-            r'user\s*base\s*(?:of\s*)?(\d+(?:\.\d+)?[KMB])',
-            r'([\d,]{4,})\s*(?:active\s*)?users',    # at least 4 digits (1000+)
-            r'([\d,]{4,})\s*customers',
-        ]
-        for pattern in user_patterns:
-            match = re.search(pattern, text_lower)
-            if match:
-                raw = match.group(1).strip().replace(',', '')
-                # Sanity check: no startup has > 5 Billion users
-                try:
-                    num = float(raw.replace('K','e3').replace('M','e6').replace('B','e9').replace('k','e3').replace('m','e6').replace('b','e9'))
-                    if num > 5_000_000_000:
-                        continue  # skip obviously corrupted value
-                except:
-                    pass
-                metrics['users'] = match.group(1).strip()
-                break
-        
-        # TAM/SAM/SOM — require explicit unit (M/B/K) to avoid bare numbers like "$350"
-        tam_patterns = [
-            r'tam\s*(?:of\s*)?(\$[\d,.]+\s*[MBK])',
-            r'total\s*addressable\s*market\s*(?:of\s*)?(\$[\d,.]+\s*[MBK])',
-            r'market\s*size\s*(?:of\s*)?(\$[\d,.]+\s*[MBK])',
-            r'sam\s*(?:of\s*)?(\$[\d,.]+\s*[MBK])',
-        ]
-        for pattern in tam_patterns:
-            match = re.search(pattern, text_lower)
-            if match:
-                metrics['tam'] = match.group(1).strip()
-                break
-        
-        # Funding amount being raised
-        funding_patterns = [
-            r'raising\s*(\$[\d,.]+\s*[MBK]?)',
-            r'seeking\s*(\$[\d,.]+\s*[MBK]?)',
-            r'looking\s*for\s*(\$[\d,.]+\s*[MBK]?)',
-            r'target\s*(?:raise\s*)?(?:of\s*)?(\$[\d,.]+\s*[MBK]?)',
-        ]
-        for pattern in funding_patterns:
-            match = re.search(pattern, text_lower)
-            if match:
-                metrics['raising'] = match.group(1).strip()
-                break
-        
-        # Valuation
-        valuation_patterns = [
-            r'valuation\s*(?:of\s*)?(\$[\d,.]+\s*[MBK]?)',
-            r'pre[-\s]*money\s*(?:of\s*)?(\$[\d,.]+\s*[MBK]?)',
-            r'post[-\s]*money\s*(?:of\s*)?(\$[\d,.]+\s*[MBK]?)',
-        ]
-        for pattern in valuation_patterns:
-            match = re.search(pattern, text_lower)
-            if match:
-                metrics['valuation'] = match.group(1).strip()
-                break
-        
-        # Runway/Burn
-        runway_patterns = [
-            r'(\d+)\s*(?:months?\s*)?(?:of\s*)?runway',
-            r'runway\s*(?:of\s*)?(\d+)\s*months?',
-            r'(\d+)\s*months?\s*(?:cash\s*)?runway',
-        ]
-        for pattern in runway_patterns:
-            match = re.search(pattern, text_lower)
-            if match:
-                metrics['runway'] = f"{match.group(1)} months"
-                break
-        
+        confidence = 1 if revenue else 0
+        metrics['_confidence_score'] = confidence
+        if confidence < 1:
+            metrics['_low_confidence'] = True
+            
         return metrics
     
-    def _extract_revenue_from_text(self, text: str) -> list:
-        """Extract revenue trajectory from text using regex patterns"""
-        import re
-        revenue_data = []
-        
-        if not text:  # ← guard: exit early if None or empty
-            return revenue_data
-        
-        # Pattern to match year-revenue pairs from text
-        # Looks for patterns like "2024 $10M", "2025: $15M", "2024 - 10,000,000", "Year 1: $47M", etc.
-        year_revenue_patterns = [
-            # Numeric years: 2024 $10M, 2025: $15M
-            r'(\d{4})\s*[:\-\s]\s*\$?([\d,]+(?:\.\d+)?)\s*([KMB]?)',
-            r'(\d{4})\s*\$?([\d,]+(?:\.\d+)?)\s*([KMB]?)',
-            r'\$?([\d,]+(?:\.\d+)?)\s*([KMB]?)\s*[:\-\s]\s*(\d{4})',
-            # Year X format: Year 1: $47M, Year 2: $110M
-            r'(?:Year\s+(\d+)|(\d+)\s*Year)\s*[:\-\s]\s*\$?([\d,]+(?:\.\d+)?)\s*([KMB]?)',
-            r'(?:Year\s+(\d+)|(\d+)\s*Year)\s*\$?([\d,]+(?:\.\d+)?)\s*([KMB]?)',
-            # Generic patterns
-            r'\$?([\d,]+(?:\.\d+)?)\s*([KMB]?)\s*[:\-\s]\s*(?:Year\s+(\d+)|(\d+)\s*Year)',
-        ]
-        
-        for pattern in year_revenue_patterns:
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            for match in matches:
-                try:
-                    # Handle different match group sizes
-                    year = None
-                    revenue_str = None
-                    unit = ''
-                    
-                    if len(match) == 3:
-                        # Pattern: (year, revenue, unit) or (revenue, unit, year)
-                        if match[0] and (match[0].isdigit() and len(match[0]) == 4 or match[0].isdigit() and int(match[0]) <= 20):
-                            year = match[0]
-                            revenue_str = match[1]
-                            unit = match[2].upper() if match[2] else ''
-                        elif match[2] and (match[2].isdigit() and len(match[2]) == 4 or match[2].isdigit() and int(match[2]) <= 20):
-                            year = match[2]
-                            revenue_str = match[0]
-                            unit = match[1].upper() if match[1] else ''
-                    elif len(match) == 4:
-                        # Pattern: (year1, year2, revenue, unit) - Year X format
-                        year = match[0] if match[0] else match[1]
-                        revenue_str = match[2]
-                        unit = match[3].upper() if match[3] else ''
-                    
-                    if not year or not revenue_str:
-                        continue
-                    
-                    # Parse revenue value
-                    revenue_num = float(revenue_str.replace(',', ''))
-                    
-                    # Convert to actual number based on unit
-                    if unit == 'B':
-                        revenue_num *= 1000000000
-                    elif unit == 'M':
-                        revenue_num *= 1000000
-                    elif unit == 'K':
-                        revenue_num *= 1000
-                    
-                    # Accept both numeric years (2023) and Year X (1, 2, 3)
-                    if year.isdigit():
-                        year_int = int(year)
-                        if (2000 <= year_int <= 2100) or (1 <= year_int <= 20):
-                            if revenue_num > 0:
-                                revenue_data.append({
-                                    "year": year,
-                                    "revenue": int(revenue_num)
-                                })
-                except (ValueError, IndexError) as e:
-                    continue
-        
-        # Sort by year and remove duplicates
-        if revenue_data:
-            # Sort by year - handle both numeric and "Year X" formats
-            def sort_key(item):
-                year = item['year']
-                if year.isdigit():
-                    year_int = int(year)
-                    # If it's a small number (1-20), treat as Year X
-                    if year_int <= 20:
-                        return (0, year_int)
-                    # If it's a large number (2000+), treat as actual year
-                    return (1, year_int)
-                return (2, 0)
+
+    def _extract_revenue_from_text(self, text: str, file_path: str = None) -> dict:
+        """Extract revenue trajectory from true tables."""
+        table_chunks = self._extract_table_chunks(file_path)
+        trend = []
+        for ch in table_chunks:
+            if "|" in ch:
+                parsed = parse_and_validate_table(ch)
+                if parsed:
+                    trend = parsed
+                    break
+
+        if not trend:
+            return {
+                "status": "unavailable",
+                "points": []
+            }
+
+        growth_trend = []
+        for y, v in trend:
+            if v >= 1e9:
+                disp = f"${v/1e9:,.1f}B"
+                unit = "B"
+            elif v >= 1e6:
+                disp = f"${v/1e6:,.1f}M"
+                unit = "M"
+            else:
+                disp = f"${v/1e3:,.0f}K"
+                unit = "K"
+            growth_trend.append({
+                "year": str(y), 
+                "value": v,
+                "display_value": disp,
+                "unit": unit
+            })
             
-            revenue_data = sorted(revenue_data, key=sort_key)
-            
-            # Remove duplicates (keep first occurrence)
-            seen_years = set()
-            unique_data = []
-            for item in revenue_data:
-                if item['year'] not in seen_years:
-                    seen_years.add(item['year'])
-                    unique_data.append(item)
-            revenue_data = unique_data
-        
-        return revenue_data
+        return {
+            "status": "ok",
+            "points": growth_trend
+        }
     
     def _add_estimated_metrics(self, metrics: Dict, stage: str = None, industry: Optional[str] = None) -> Dict:
         """

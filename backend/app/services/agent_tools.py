@@ -21,34 +21,10 @@ from typing import Dict, List, Any, Optional
 def retrieve_chunks(query: str, company: str = None, k: int = 6) -> List[Dict]:
     """
     BM25 retrieval over the stored pitch deck / financial corpus.
-    Sources: FAISS metadata index + PostgreSQL pitch deck extracted text.
+    Sources: PostgreSQL pitch deck extracted text.
     Returns top-k relevant chunks with scores.
     """
-    from app.services.retriever import retriever
-
-    results = retriever.retrieve_for_email(query, company=company, k=k)
-
-    # Always supplement with PostgreSQL pitch deck data
-    pg_chunks = _retrieve_from_postgres(query, company=company, k=k)
-    seen = {r.get("text", "")[:80] for r in results}
-    for chunk in pg_chunks:
-        if chunk.get("text", "")[:80] not in seen:
-            results.append(chunk)
-            seen.add(chunk.get("text", "")[:80])
-
-    # Also try FAISS vector search as final fallback
-    if not results:
-        try:
-            from app.services.rag_service import rag
-            if rag.index is None:
-                rag.load()
-            vector_results = rag.query(query, k=k, symbol=company)
-            for vr in vector_results:
-                if vr.get("text", "")[:80] not in seen:
-                    vr["bm25_score"] = vr.get("score", 0.5)
-                    results.append(vr)
-        except Exception:
-            pass
+    results = _retrieve_from_postgres(query, company=company, k=k)
 
     # Sort by BM25 score and cap at k
     results.sort(key=lambda x: x.get("bm25_score", 0), reverse=True)

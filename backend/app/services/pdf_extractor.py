@@ -234,6 +234,12 @@ class PDFExtractor:
                 
                 # Combine slide text
                 slide_text = "\n\n".join(slide_text_parts)
+                
+                # Chart filter: remove isolated small numbers (graph ticks like 20, 25, 27)
+                slide_text = re.sub(r'\b(\$?\d{1,3})\b', '', slide_text)
+                # Remove sequences of many small numbers (axes)
+                slide_text = re.sub(r'(\b\d{1,3}\b[\s|,]+){3,}', '', slide_text)
+
                 if slide_text.strip():
                     all_text_parts.append(slide_text)
                     

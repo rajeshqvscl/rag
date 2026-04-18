@@ -377,63 +377,31 @@ def analyze_pitch_deck_detailed(extracted_text: str, company_name: str, key_metr
     # ← guard all inputs before building prompt
     extracted_text = extracted_text or ""
     company_name = company_name or "Unknown Company"
-    metrics_str = json.dumps(key_metrics, indent=2) if key_metrics else "No metrics available"
+    revenue_val = key_metrics.get("revenue", "Unavailable")
+    growth_val = key_metrics.get("growth", "Unavailable")
+    tam_val = key_metrics.get("tam", "Unavailable")
     
-    prompt = f"""You are a senior venture capital analyst. Analyse this pitch deck with strict data discipline.
+    prompt = f"""You are a VC analyst.
 
-CRITICAL RULES — follow without exception:
-1. ONLY use data explicitly present in the extracted text below.
-2. If a metric shows "Not found in document" or is missing — state "Not available" for that field. Do NOT invent or estimate.
-3. If the extraction appears incomplete, say "⚠ Extraction incomplete — limited data available" at the top.
-4. Contradictory numbers must be flagged: write "DATA CONFLICT: [explain]".
-5. Never use phrases like "likely", "appears to be", "suggests" for factual metrics — only for qualitative observations.
+STRICT:
+- Use ONLY provided metrics.
+- If a metric is "Unavailable", say so.
+- Do NOT infer numbers.
 
-EXTRACTED PITCH DECK TEXT ({len(extracted_text)} characters from {len(extracted_text.split(chr(10)))} lines):
+Metrics:
+Revenue: {revenue_val}
+Growth: {growth_val}
+TAM: {tam_val}
+
+Context for Risks/Review:
 {extracted_text[:12000]}
 
-EXTRACTED METRICS (from regex parsing — NOT AI-generated):
-{metrics_str}
-
-Produce this exact structure:
-
-## Executive Summary
-2–3 sentences: company name, sector, stage, core value proposition. Cite one specific data point from the text.
-
-## Key Metrics (Extracted Only)
-For each metric below, write the exact value from the text or "Not available":
-- Revenue: [value or Not available]
-- ARR/MRR: [value or Not available]
-- Growth Rate: [value or Not available]
-- Users/Customers: [value or Not available]
-- TAM: [value or Not available]
-- Funding Sought: [value or Not available]
-- Runway: [value or Not available]
-
-## Key Strengths
-List 3–5 specific strengths supported by evidence from the text. Quote or reference specific lines.
-
-## Key Risks & Concerns
-List 3–5 risks. Be specific — reference what is missing or concerning from the actual data.
-
-## Financial Highlights
-### Revenue & Growth
-Only real numbers from the text. If none: "Insufficient financial data extracted."
-
-### Capital Deployment
-Only if mentioned in the text. If not: "Not specified in pitch deck."
-
-## Investment Recommendation
-**STANCE: [STRONG INTEREST / CONSIDER / PASS / PROCEED WITH CAUTION]**
-
-Justify with 2–3 specific data points from the text.
-
-Due Diligence Priorities:
-1. [Specific question based on gaps in the data]
-2. [Specific question based on gaps in the data]
-3. [Specific question based on gaps in the data]
-
----
-Output clean markdown only. No preamble. If data is genuinely insufficient, say so clearly rather than padding with generic investor language."""
+Output:
+- Verified metrics
+- Data reliability note
+- Risks
+- Short personalized email referencing ONLY available metrics
+"""
 
     try:
         response = call_claude_with_retry([{"role": "user", "content": prompt}], max_tokens=2500)
@@ -516,66 +484,30 @@ def extract_revenue_from_analysis(analysis_text: str) -> list:
     
     return sorted(unique_data, key=lambda x: x['year'])
 
-def generate_draft_email(analysis_summary: str, company: str, revenue_data: list = None):
+def generate_draft_email(analysis_summary: str, company: str, key_metrics: dict = None):
     """Generates a grounded investor outreach email based only on real extracted data."""
-    # ← guard both inputs
-    analysis_summary = analysis_summary or "No analysis available"
-    company = company or "Unknown Company"
+    key_metrics = key_metrics or {}
+    
+    if key_metrics.get("revenue") == "Unreliable (graph data ignored)" or key_metrics.get("_low_confidence"):
+        return """Hi Team,
 
-    proj_str = ""
-    if revenue_data:
-        proj_str = "\nRevenue trajectory extracted from deck:\n" + "\n".join(
-            [f"- {r.get('year', 'N/A')}: {r.get('revenue', 'N/A')}" for r in revenue_data]
-        )
+I reviewed your pitch deck. While there are strong indicators of growth, some financial data appears inconsistent.
 
-    prompt = f"""You are a venture capitalist writing a concise, data-grounded outreach email.
-
-STRICT RULES:
-1. Use ONLY the data in the Analysis Context below. Do NOT invent metrics.
-2. If a metric says "Not available" or "Not found in document" — do not mention it.
-3. Reference AT LEAST 2 specific data points that actually appear in the context.
-4. Mention 1 risk or open question that needs clarification.
-5. BANNED phrases: "intrigued by your vision", "impressive journey", "exciting opportunity", "look forward to connecting", "game-changing". Replace with specific observations.
-6. Length: 150–200 words max. No fluff.
-
-Analysis Context for {company}:
-{analysis_summary[:3000]}
-{proj_str}
-
-Write the email in this exact structure:
-
-Subject: [Specific to their sector/product — not generic]
-
-Hi [Company] Team,
-
-[Opening sentence: cite ONE specific fact from the analysis — e.g., revenue, market size, stage, product detail]
-
-[2–3 sentences: reference specific data points — what stands out, what needs clarification]
-
-[One direct ask: 30-min call, specific question, or next step]
+I’d like to understand your revenue trajectory and assumptions better.
 
 Best,
 [Your Name]
-[Title] | [Firm]
+"""
 
-IMPORTANT: If no useful data is available from the analysis, write a brief honest note saying the pitch deck lacked sufficient detail and request a revised deck with key metrics before scheduling a call."""
+    return f"""Hi Team,
 
-    try:
-        response = call_claude_with_retry([{"role": "user", "content": prompt}], max_tokens=600)
-        return response.content[0].text
-    except Exception as e:
-        print(f"Claude API error in generate_draft_email: {e}")
-        # Grounded fallback — honest about missing data
-        return f"""Subject: {company} — Pitch Deck Review
+I noticed your reported revenue of {key_metrics.get('revenue', 'N/A')} and strong growth.
 
-Hi {company} Team,
+I’d love to understand your scale strategy further.
 
-We have reviewed the materials you shared. Before scheduling a call, we'd like to understand your current revenue, growth trajectory, and use of funds in more detail — the pitch deck provided limited financial data.
-
-Could you share an updated deck or a one-pager with your key metrics (ARR/MRR, growth rate, burn rate, runway)?
-
-Best regards,
-[Your Name] | [Firm]"""
+Best,
+[Your Name]
+"""
 
 # Lazy client proxy for import compatibility
 class _ClientProxy:

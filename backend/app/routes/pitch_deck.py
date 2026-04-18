@@ -236,9 +236,6 @@ def generate_fallback_analysis(company_name: str, extracted: Dict, key_metrics: 
         sections.append(f"3. **Product Assessment:** Evaluate product-market fit indicators\n")
         sections.append(f"4. **Follow-on Review:** Re-assess after 6-12 months of progress\n")
     
-    sections.append(f"\n---\n\n")
-    sections.append(f"*This analysis was generated using AI-powered document extraction with **Voyage AI voyage-large-2** embeddings (1536-dim). ")
-    sections.append(f"The system uses structured PDF extraction with PyMuPDF, intelligent chunking, and semantic analysis to extract key metrics and generate investment insights.*")
     
     return "".join(sections)
 
@@ -407,92 +404,13 @@ async def upload_pitch_deck(
         # Extract revenue trajectory specifically for this pitch deck
         revenue_trajectory = pitch_deck_service._extract_revenue_from_text(text_content)
         
-        # If no revenue trajectory found, generate realistic projections based on extracted metrics
-        if not revenue_trajectory and key_metrics.get('revenue'):
-            # Parse current revenue and generate 5-year projection
-            current_rev = key_metrics.get('revenue', '$1M')
-            growth_rate = key_metrics.get('growth', '50%').replace('%', '')
-            try:
-                growth = float(growth_rate) / 100
-            except:
-                growth = 0.5
-            
-            # Parse revenue value more carefully
-            rev_str = current_rev.replace('$', '').replace(',', '').strip()
-            multiplier = 1
-            if 'B' in rev_str.upper():
-                multiplier = 1000000000
-                rev_str = rev_str.upper().replace('B', '')
-            elif 'M' in rev_str.upper():
-                multiplier = 1000000
-                rev_str = rev_str.upper().replace('M', '')
-            elif 'K' in rev_str.upper():
-                multiplier = 1000
-                rev_str = rev_str.upper().replace('K', '')
-            elif 'Crore' in rev_str:
-                # Handle Indian numbering (1 Crore = 10 Million)
-                multiplier = 10000000
-                rev_str = rev_str.replace('Crore', '').strip()
-            elif 'Lakh' in rev_str:
-                # Handle Indian numbering (1 Lakh = 100 Thousand)
-                multiplier = 100000
-                rev_str = rev_str.replace('Lakh', '').strip()
-            
-            try:
-                base_revenue = float(rev_str) * multiplier
-                # Validate the base revenue is reasonable (at least $10K)
-                if base_revenue < 10000:
-                    base_revenue = 1000000  # Default to $1M if too small
-                    
-                # Generate 5-year projections starting from 2026
-                current_year = 2026
-                revenue_trajectory = []
-                for i in range(6):
-                    year = str(current_year + i)
-                    projected_revenue = int(base_revenue * ((1 + growth) ** i))
-                    # Cap at reasonable max to avoid overflow
-                    projected_revenue = min(projected_revenue, 999999999999)
-                    revenue_trajectory.append({"year": year, "revenue": projected_revenue})
-            except Exception as e:
-                print(f"Error generating revenue projections: {e}")
-                pass
+        # Ensure no hallucinated data drives the chart
+        if revenue_trajectory.get("status") != "ok":
+            revenue_trajectory = {"status": "no_valid_data", "points": []}
         
-        # Generate embeddings for semantic analysis using structured chunks
-        try:
-            # Use normalized chunks if available (better for financial data)
-            structured_chunks = extracted.get('chunks', [])
-            if structured_chunks:
-                # Prioritize financial chunks, then product/market
-                priority_types = ['financials', 'product', 'market', 'team', 'general']
-                sorted_chunks = sorted(
-                    structured_chunks,
-                    key=lambda c: priority_types.index(c.get('type', 'general')) if c.get('type') in priority_types else 99
-                )
-                
-                # Use normalized text for financial chunks, regular text for others
-                chunk_texts = []
-                for c in sorted_chunks[:5]:  # Top 5 most relevant chunks
-                    text = c.get('normalized_text') or c.get('text') or ''  # ← guard
-                    if text:
-                        chunk_texts.append(text[:500])
-                
-                if chunk_texts:
-                    embeddings = [get_embedding(chunk) for chunk in chunk_texts]
-                    semantic_summary = f"Analyzed {len(embeddings)} structured sections (financials/product/market)"
-                    print(f"Generated {len(embeddings)} embeddings from structured chunks")
-                else:
-                    semantic_summary = "No structured content available"
-            else:
-                # Fallback: use normalized text chunks
-                text_chunks = [text_content[i:i+500] for i in range(0, min(len(text_content), 2000), 500)]
-                if text_chunks:
-                    embeddings = [get_embedding(chunk) for chunk in text_chunks[:3]]
-                    semantic_summary = f"Analyzed {len(embeddings)} document sections using fallback chunking"
-                else:
-                    semantic_summary = "No text content available"
-        except Exception as e:
-            semantic_summary = f"Semantic analysis unavailable: {str(e)}"
-            print(f"Embedding generation error: {e}")
+        # Note: Embedding semantic analysis is disabled for Phase 1.
+        # Strict BM25 / keyword strategy used.
+        semantic_summary = "Semantic embedding analysis disabled for Phase 1"
         
         # Generate detailed VC-style analysis using Claude Sonnet 4
         print(f"Generating detailed VC analysis for {company_name} using Claude Sonnet 4...")
@@ -511,6 +429,7 @@ async def upload_pitch_deck(
             )
 
         # Add analysis metadata section (frontend handles main title)
+        warning_msg = "\n⚠ **Financial data extracted from charts may be unreliable.**\n"
         analysis_header = f"""**Analysis Metadata:**
 - **Company:** {company_name}
 - **Industry:** {extracted.get('industry') or 'Technology'}
@@ -518,50 +437,16 @@ async def upload_pitch_deck(
 - **Document Pages:** {extracted.get('pages', 0)}
 - **Analysis ID:** {unique_id}
 - **Analysis Method:** {'Claude Sonnet 4 (AI-powered)' if claude_result.get('detailed_analysis') else 'Local Fallback (Pattern Analysis)'}
-
+{warning_msg}
 ---
 
 """
 
         # ← safe: both sides are now guaranteed strings
         analysis_markdown = analysis_header + analysis_markdown
-        
-        # Generate Google Meet scheduling email with general questions
-        email_draft = f"""Subject: Investment Interest - {company_name} | Let's Schedule a Call
-
-Hi {company_name} Team,
-
-I hope this email finds you well. My name is [Your Name], and I'm reaching out from [Firm Name] regarding your recent pitch deck submission.
-
-After reviewing your materials, I'm intrigued by your vision for {company_name} and would love to learn more about what you're building in the {extracted.get('industry', 'technology')} space.
-
-**Would you be available for a 30-minute Google Meet call next week?** I'm flexible with timing and can work around your schedule. Here's a link to book directly: [Calendar Link]
-
-To help me prepare for our conversation, I'd appreciate it if you could share:
-
-1. **Founding Story:** What inspired you to start this company, and what problem are you solving?
-
-2. **Traction & Metrics:** Could you share your current key metrics (revenue, growth rate, user base, etc.) and what milestones you've achieved to date?
-
-3. **Market Positioning:** Who are your main competitors, and what makes your solution 10x better?
-
-4. **Capital Efficiency:** How do you plan to deploy the capital you're raising? What's your monthly burn rate and current runway?
-
-5. **Team & Hiring:** What key roles are you looking to fill in the next 6-12 months?
-
-6. **Partnership Vision:** What would an ideal partnership with our firm look like to you beyond just capital?
-
-Looking forward to connecting and exploring how we might support your growth journey.
-
-Best regards,
-
-[Your Name]
-[Title]
-[Firm Name]
-[Phone] | [Email]
-[LinkedIn Profile]
-
-P.S. If you have any questions ahead of our call, feel free to reply to this email or reach me directly at [Phone]."""
+        # Generate Google Meet scheduling email with grounded RAG data
+        from app.services.claude_service import generate_draft_email
+        email_draft = generate_draft_email(analysis_markdown, company_name, key_metrics)
         
         # Save to database
         pitch_deck = PitchDeck(

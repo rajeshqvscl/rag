@@ -293,8 +293,8 @@ function renderPitchDeckAnalysis(pitchDeck) {
             .replace(/\*\*(.*?)\*\*/g, '<strong style="color: #fff;">$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/^- (.*$)/gim, '<li style="margin-left: 1.5rem; margin-bottom: 0.5rem;">$1</li>')
-            .replace(/\n\n/g, '</p><p style="line-height: 1.7; margin-bottom: 1rem; color: var(--text);">')
-            .replace(/\n/g, ' ');
+            .replace(/\n\n/g, '</p><br><p style="line-height: 1.5; margin-bottom: 0.5rem; color: var(--text);">')
+            .replace(/\n/g, '<br>');
         
         // Wrap in proper structure
         analysisHtml += `<div style="font-family: inherit;">`;
@@ -473,96 +473,41 @@ function renderGrowthTrendChart(pitchDeck) {
     const chartContainer = document.getElementById('growth-chart');
     if (!chartContainer) return;
     
-    const metrics = pitchDeck.key_metrics || {};
-    const revenueData = pitchDeck.revenue_data || [];
+    // Default structure to no_valid_data if missing
+    let trend = pitchDeck.revenue_data || { status: "no_valid_data", points: [] };
     
-    console.log('Revenue data from graphs:', revenueData);
-    
-    // Detect unit from metrics.revenue (e.g., "$5M" → "M", "$2B" → "B")
-    let graphUnit = '';
-    const revStr = metrics.revenue || metrics.arr || metrics.mrr || '';
-    if (revStr) {
-        const unitMatch = revStr.match(/[KMB]$/i);
-        if (unitMatch) {
-            graphUnit = unitMatch[0].toUpperCase();
-            console.log('Detected graph unit from metrics:', graphUnit);
-        }
+    // Adapter if old structure array was somehow passed
+    if (Array.isArray(trend)) {
+        trend = { status: trend.length >= 3 ? "ok" : "no_valid_data", points: trend };
+    }
+
+    if (trend.status !== "ok" || !trend.points || trend.points.length === 0) {
+        chartContainer.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; height: 100%; width: 100%; border: 1px dashed rgba(255,255,255,0.1); border-radius: var(--radius-sm);">
+                <p style="color: var(--text-muted); font-size: 0.9rem;">No reliable growth data found</p>
+            </div>
+        `;
+        return;
     }
     
-    // Use extracted graph data if available, otherwise fall back to estimates
-    let years, values;
+    const pointsData = trend.points;
+    const validPoints = pointsData.filter(d => {
+        const val = parseFloat(d.revenue) || parseFloat(d.value) || 0;
+        return val >= 1000;
+    });
     
-    if (revenueData && revenueData.length > 0) {
-        // Use actual revenue trajectory data extracted from graphs
-        years = revenueData.map(d => d.year);
-        values = revenueData.map(d => {
-            // If graph values are small numbers but metrics show M/B units,
-            // multiply values accordingly
-            let val = d.revenue;
-            if (graphUnit === 'M' && val < 1000000) {
-                val = val * 1000000;
-            } else if (graphUnit === 'B' && val < 1000000000) {
-                val = val * 1000000000;
-            } else if (graphUnit === 'K' && val < 1000) {
-                val = val * 1000;
-            }
-            return val;
-        });
-        console.log('Using extracted graph data with unit scaling:', years, values, 'Unit:', graphUnit);
-    } else {
-        // Generate projected revenue data (2026-2031) based on estimates
-        years = ['2026', '2027', '2028', '2029', '2030', '2031'];
-        
-        // Parse current revenue from extracted metrics
-        let baseRevenue = 10000000; // Default $10M if no data
-        const revStr = metrics.revenue || metrics.arr || metrics.mrr || '';
-        
-        console.log('Revenue string from metrics:', revStr);
-        
-        if (revStr) {
-            // Parse revenue string like "$2.5M", "$500K", "$10,000,000"
-            const revMatch = revStr.match(/\$?([\d,.]+)\s*([MBK]?)/i);
-            if (revMatch) {
-                let num = parseFloat(revMatch[1].replace(/,/g, ''));
-                const unit = revMatch[2].toUpperCase();
-                
-                if (unit === 'B') baseRevenue = num * 1000000000;
-                else if (unit === 'M') baseRevenue = num * 1000000;
-                else if (unit === 'K') baseRevenue = num * 1000;
-                else baseRevenue = num; // Assume raw number
-                
-                console.log('Parsed base revenue:', baseRevenue, 'from string:', revStr);
-            }
-        } else {
-            console.log('No revenue found, using default:', baseRevenue);
-        }
-        
-        // Parse growth rate from extracted metrics
-        let growthRate = 0.35; // Default 35% annual growth
-        const growthStr = metrics.growth || metrics.growth_rate || '';
-        
-        console.log('Growth string from metrics:', growthStr);
-        
-        if (growthStr) {
-            const growthMatch = growthStr.match(/(\d+\.?\d*)/);
-            if (growthMatch) {
-                let rate = parseFloat(growthMatch[1]);
-                // Convert to decimal (e.g., 150% -> 1.5, 35% -> 0.35)
-                growthRate = rate > 1 ? rate / 100 : rate;
-                console.log('Parsed growth rate:', growthRate, 'from string:', growthStr);
-            }
-        } else {
-            console.log('No growth rate found, using default:', growthRate);
-        }
-        
-        // Calculate projected values using compound growth formula
-        values = years.map((year, idx) => {
-            return baseRevenue * Math.pow(1 + growthRate, idx);
-        });
-        
-        console.log('Projected revenue values (estimated):', values);
+    if (validPoints.length < 3) {
+        chartContainer.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; height: 100%; width: 100%; border: 1px dashed rgba(255,255,255,0.1); border-radius: var(--radius-sm);">
+                <p style="color: var(--text-muted); font-size: 0.9rem;">No reliable growth data found</p>
+            </div>
+        `;
+        return;
     }
-    
+
+    const years = validPoints.map(d => d.year);
+    const values = validPoints.map(d => parseFloat(d.revenue) || parseFloat(d.value) || 0);
+
     const maxVal = Math.max(...values);
     const minVal = Math.min(...values);
     const range = maxVal - minVal || 1;
@@ -584,68 +529,46 @@ function renderGrowthTrendChart(pitchDeck) {
     // Create smooth curve path
     let pathD = `M ${points[0].x} ${points[0].y}`;
     for (let i = 1; i < points.length; i++) {
-        const prev = points[i - 1];
-        const curr = points[i];
-        const cp1x = prev.x + (curr.x - prev.x) / 2;
-        const cp2x = prev.x + (curr.x - prev.x) / 2;
-        pathD += ` C ${cp1x} ${prev.y}, ${cp2x} ${curr.y}, ${curr.x} ${curr.y}`;
+        const p0 = points[i - 1];
+        const p1 = points[i];
+        const cx = (p0.x + p1.x) / 2;
+        pathD += ` C ${cx} ${p0.y}, ${cx} ${p1.y}, ${p1.x} ${p1.y}`;
     }
     
-    // Area path
+    // Area under curve
     const areaD = `${pathD} L ${points[points.length - 1].x} ${padding.top + chartHeight} L ${points[0].x} ${padding.top + chartHeight} Z`;
     
-    // Format currency
-    const formatCurrency = (val) => {
-        if (val >= 1000000000) return `$${(val / 1000000000).toFixed(1)}B`;
-        if (val >= 1000000) return `$${(val / 1000000).toFixed(1)}M`;
-        return `$${(val / 1000).toFixed(0)}K`;
-    };
-    
-    // Y-axis labels
+    // Horizontal grid lines
     const yLabels = [0, 0.25, 0.5, 0.75, 1].map(pct => {
-        const val = minVal + range * pct;
+        const val = minVal + pct * range;
         const y = padding.top + chartHeight - pct * chartHeight;
-        return `<text x="${padding.left - 10}" y="${y + 4}" text-anchor="end" fill="rgba(255,255,255,0.5)" font-size="10">${formatCurrency(val)}</text>`;
+        let label = '$' + (val >= 1000000000 ? (val/1000000000).toFixed(1) + 'B' : 
+                          Math.floor(val/1000000) > 0 ? (val / 1000000).toFixed(1) + 'M' : 
+                          (val / 1000).toFixed(0) + 'K');
+        return `
+            <line x1="${padding.left}" y1="${y}" x2="${padding.left + chartWidth}" y2="${y}" stroke="rgba(255,255,255,0.1)" stroke-dasharray="3,3" />
+            <text x="${padding.left - 10}" y="${y + 4}" text-anchor="end" fill="rgba(255,255,255,0.5)" font-size="10">${label}</text>
+        `;
     }).join('');
     
-    // X-axis labels - format years nicely
-    const formatYear = (year) => {
-        // If year is a single digit or starts with 0 (like '1', '02', '03'), format as "Year X"
-        if (/^\d{1,2}$/.test(year) || /^0\d$/.test(year)) {
-            const yearNum = parseInt(year, 10);
-            return `Y${yearNum}`;
-        }
-        // If it's a 4-digit year, show last 2 digits (e.g., "2024" → "24")
-        if (/^\d{4}$/.test(year)) {
-            return year.slice(-2);
-        }
-        return year;
-    };
-    
+    // Vertical grid lines (years)
     const xLabels = points.map(p => {
-        const label = formatYear(p.year);
-        return `<text x="${p.x}" y="${padding.top + chartHeight + 20}" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="10">${label}</text>`;
+        return `<text x="${p.x}" y="${padding.top + chartHeight + 20}" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="10">${p.year}</text>`;
     }).join('');
     
-    // Grid lines
-    const gridLines = [0, 0.25, 0.5, 0.75, 1].map(pct => {
-        const y = padding.top + chartHeight - pct * chartHeight;
-        return `<line x1="${padding.left}" y1="${y}" x2="${padding.left + chartWidth}" y2="${y}" stroke="rgba(255,255,255,0.1)" stroke-dasharray="3,3" />`;
-    }).join('');
-    
+    // Construct full SVG
     const svg = `
-        <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+        <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" style="overflow: visible;">
+            <!-- Definitions -->
             <defs>
-                <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style="stop-color:rgba(0,212,170,0.3)" />
-                    <stop offset="100%" style="stop-color:rgba(0,212,170,0.05)" />
+                <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#00d4aa" stop-opacity="0.3" />
+                    <stop offset="100%" stop-color="#00d4aa" stop-opacity="0.0" />
                 </linearGradient>
             </defs>
             
-            ${gridLines}
-            
-            <!-- Area fill -->
-            <path d="${areaD}" fill="url(#areaGradient)" />
+            <!-- Area -->
+            <path d="${areaD}" fill="url(#chartGradient)" />
             
             <!-- Line -->
             <path d="${pathD}" fill="none" stroke="#00d4aa" stroke-width="2" />
@@ -653,11 +576,6 @@ function renderGrowthTrendChart(pitchDeck) {
             <!-- Data points -->
             ${points.map(p => `
                 <circle cx="${p.x}" cy="${p.y}" r="4" fill="#00d4aa" stroke="#0a0e27" stroke-width="2" />
-            `).join('')}
-            
-            <!-- Data point value labels with units -->
-            ${points.map(p => `
-                <text x="${p.x}" y="${p.y - 10}" text-anchor="middle" fill="#00d4aa" font-size="9" font-weight="500">${formatCurrency(p.val)}</text>
             `).join('')}
             
             <!-- Labels -->
