@@ -1,4 +1,5 @@
 faiss-cpu
+rank-bm25
 sentence-transformers
 fastapi
 uvicorn

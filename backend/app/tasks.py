@@ -1,4 +1,3 @@
-from app.services.drive_service import find_or_create_folder, upload_file
 from app.services.file_extractor import extract_text
 from app.services.claude_service import structure_text
 from app.services.rag_service import rag
@@ -10,11 +9,26 @@ try:
 except ImportError:
     celery_app = None
 
+# Lazy import for Google Drive (optional integration)
+_drive_available = False
+try:
+    from app.services.drive_service import find_or_create_folder, upload_file
+    _drive_available = True
+except ImportError:
+    def find_or_create_folder(company): return None
+    def upload_file(path, folder_id): return None
+
 
 def process_file_task(file_path, file_name, company):
     try:
         print("\n===== TASK STARTED =====")
         print("File:", file_name)
+
+        # Early-exit guards
+        if not file_path:
+            return {"status": "error", "error": "file_path is None"}
+        file_name = file_name or ""
+        company = company or ""
 
         # 1. Drive Upload
         folder_id = find_or_create_folder(company)
@@ -23,19 +37,19 @@ def process_file_task(file_path, file_name, company):
         print("Uploaded:", drive_id)
 
         # 2. Extract
-        text = extract_text(file_path)
+        text = extract_text(file_path) or ""  # ← safe guard
 
         if not text.strip():
             return {"status": "empty"}
 
         # 3. Claude
-        structured = structure_text(text)
+        structured = structure_text(text) or {}  # ← safe guard
 
-        # 4. RAG
+        # 4. RAG — use safe defaults so no key is None
         rag.add_documents([{
-            "text": structured.get("content", ""),
-            "type": structured.get("type", "unknown"),
-            "section": structured.get("section", "general")
+            "text": structured.get("content") or "",
+            "type": structured.get("type") or "unknown",
+            "section": structured.get("section") or "general"
         }])
 
         print("Stored in RAG:", rag.index.ntotal)
@@ -43,8 +57,8 @@ def process_file_task(file_path, file_name, company):
         return {
             "status": "success",
             "file": file_name,
-            "content": structured.get("content", ""),
-            "type": structured.get("type", "unknown")
+            "content": structured.get("content") or "",
+            "type": structured.get("type") or "unknown"
         }
 
     except Exception as e:

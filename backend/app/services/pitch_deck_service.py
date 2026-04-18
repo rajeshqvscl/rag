@@ -16,7 +16,6 @@ try:
 except ImportError as e:
     print(f"Structured PDF extractor not available: {e}")
     STRUCTURED_EXTRACTION_AVAILABLE = False
-    import PyPDF2
 
 # Check if Claude API is available
 ANTHROPIC_AVAILABLE = os.getenv("ANTHROPIC_API_KEY") is not None
@@ -151,19 +150,22 @@ class PitchDeckService:
             
             # Debug output
             print(f"PDF Pages: {result['pages']}")
+            # Guard: ensure text is always a string before slicing
+            result["text"] = result["text"] or ""
             print(f"Extracted text (first 500 chars): {result['text'][:500]}")
             print(f"Total text length: {len(result['text'])}")
             
-            # Extract structured information from normalized text (better for metrics)
-            normalized_full = " ".join([c.get("normalized_text", c.get("text", "")) for c in result["chunks"]]) if result["chunks"] else result["text"]
+            # Guard: extract only if we have text
+            text_for_analysis = result["text"] or ""
+            normalized_full = " ".join([c.get("normalized_text", c.get("text", "")) or "" for c in result["chunks"]]) if result["chunks"] else text_for_analysis
             
             result["key_metrics"] = self._extract_metrics(normalized_full)
-            result["founders"] = self._extract_founders(result["text"])
-            result["team_size"] = self._extract_team_size(result["text"])
-            result["industry"] = self._extract_industry(result["text"])
-            result["stage"] = self._extract_funding_stage(result["text"])
-            result["company_name"] = self._extract_company_name(result["text"], file_name)
-            result["summary"] = self._generate_summary(result["text"], result["key_metrics"])
+            result["founders"] = self._extract_founders(text_for_analysis)
+            result["team_size"] = self._extract_team_size(text_for_analysis)
+            result["industry"] = self._extract_industry(text_for_analysis)
+            result["stage"] = self._extract_funding_stage(text_for_analysis)
+            result["company_name"] = self._extract_company_name(text_for_analysis, file_name)
+            result["summary"] = self._generate_summary(text_for_analysis, result["key_metrics"])
             
             # Add estimated metrics if none found
             result["key_metrics"] = self._add_estimated_metrics(result["key_metrics"], result["stage"], result["industry"])
@@ -178,13 +180,13 @@ class PitchDeckService:
         return result
     
     def _basic_pdf_extract(self, file_path: str):
-        """Basic PDF extraction fallback"""
-        import PyPDF2
+        """Basic PDF extraction fallback using pypdf"""
+        import pypdf
         full_text = ""
         with open(file_path, 'rb') as file:
-            reader = PyPDF2.PdfReader(file)
+            reader = pypdf.PdfReader(file)
             for page in reader.pages:
-                text = page.extract_text() or ""
+                text = page.extract_text() or ""  # ← safe guard
                 full_text += text + "\n"
         return full_text, [], {"total_chunks": 0}
     
@@ -253,46 +255,7 @@ class PitchDeckService:
                     metrics['revenue'] = match.group(1).strip()
                     break
         
-        # If still no revenue, try to extract market size as a proxy
-        if 'revenue' not in metrics:
-            # Look for any large number with currency symbol (market size)
-            large_number_patterns = [
-                r'[\$₹]?([\d,.]+(?:\.\d+)?)\s*(?:lakh\s*crore|crore|billion|million)',
-                r'[\$₹]?([\d,.]+(?:\.\d+)?)\s*cr',  # Crore
-            ]
-            for pattern in large_number_patterns:
-                matches = re.findall(pattern, text_lower)
-                for match in matches:
-                    try:
-                        num = float(match.replace(',', ''))
-                        
-                        # Only use if it's a reasonably large number (market size)
-                        if num >= 1:  # At least 1 unit
-                            # Try to determine the unit from context
-                            if 'lakh crore' in text_lower:
-                                metrics['market_size'] = f"${num} Lakh Crore"
-                                metrics['_market_size'] = True
-                                print(f"Extracted market size as proxy: {metrics['market_size']}")
-                                break
-                            elif 'crore' in text_lower:
-                                metrics['market_size'] = f"${num} Crore"
-                                metrics['_market_size'] = True
-                                print(f"Extracted market size as proxy: {metrics['market_size']}")
-                                break
-                            elif 'billion' in text_lower:
-                                metrics['market_size'] = f"${num}B"
-                                metrics['_market_size'] = True
-                                print(f"Extracted market size as proxy: {metrics['market_size']}")
-                                break
-                            elif 'million' in text_lower:
-                                metrics['market_size'] = f"${num}M"
-                                metrics['_market_size'] = True
-                                print(f"Extracted market size as proxy: {metrics['market_size']}")
-                                break
-                    except (ValueError) as e:
-                        continue
-                if 'market_size' in metrics:
-                    break
+
         
         # Fallback 2: Look for any dollar amount with M/B/K near "revenue"
         if 'revenue' not in metrics:
@@ -340,26 +303,36 @@ class PitchDeckService:
                 metrics['growth'] = f"{match.group(1)}%"
                 break
         
-        # Users/Customers
+        # Users/Customers — require K/M/B suffix OR at least 4 raw digits
+        # NOTE: run on original text, not normalized (normalized expands 2B → 2,000,000,000)
         user_patterns = [
-            r'(\d+[KMB]?)\s*(?:active\s*)?users',
-            r'(\d+[KMB]?)\s*customers',
-            r'(\d+[KMB]?)\s*subscribers',
-            r'user\s*base\s*(?:of\s*)?(\d+[KMB]?)',
-            r'([\d,]+)\s*(?:active\s*)?users',
-            r'([\d,]+)\s*customers',
+            r'(\d+(?:\.\d+)?[KMB])\s*(?:active\s*)?users',
+            r'(\d+(?:\.\d+)?[KMB])\s*customers',
+            r'(\d+(?:\.\d+)?[KMB])\s*subscribers',
+            r'user\s*base\s*(?:of\s*)?(\d+(?:\.\d+)?[KMB])',
+            r'([\d,]{4,})\s*(?:active\s*)?users',    # at least 4 digits (1000+)
+            r'([\d,]{4,})\s*customers',
         ]
         for pattern in user_patterns:
             match = re.search(pattern, text_lower)
             if match:
+                raw = match.group(1).strip().replace(',', '')
+                # Sanity check: no startup has > 5 Billion users
+                try:
+                    num = float(raw.replace('K','e3').replace('M','e6').replace('B','e9').replace('k','e3').replace('m','e6').replace('b','e9'))
+                    if num > 5_000_000_000:
+                        continue  # skip obviously corrupted value
+                except:
+                    pass
                 metrics['users'] = match.group(1).strip()
                 break
         
-        # TAM/SAM/SOM
+        # TAM/SAM/SOM — require explicit unit (M/B/K) to avoid bare numbers like "$350"
         tam_patterns = [
-            r'tam\s*(?:of\s*)?(\$[\d,.]+\s*[MBK]?)',
-            r'total\s*addressable\s*market\s*(?:of\s*)?(\$[\d,.]+\s*[MBK]?)',
-            r'market\s*size\s*(?:of\s*)?(\$[\d,.]+\s*[MBK]?)',
+            r'tam\s*(?:of\s*)?(\$[\d,.]+\s*[MBK])',
+            r'total\s*addressable\s*market\s*(?:of\s*)?(\$[\d,.]+\s*[MBK])',
+            r'market\s*size\s*(?:of\s*)?(\$[\d,.]+\s*[MBK])',
+            r'sam\s*(?:of\s*)?(\$[\d,.]+\s*[MBK])',
         ]
         for pattern in tam_patterns:
             match = re.search(pattern, text_lower)
@@ -411,7 +384,7 @@ class PitchDeckService:
         import re
         revenue_data = []
         
-        if not text:
+        if not text:  # ← guard: exit early if None or empty
             return revenue_data
         
         # Pattern to match year-revenue pairs from text
@@ -507,46 +480,28 @@ class PitchDeckService:
         return revenue_data
     
     def _add_estimated_metrics(self, metrics: Dict, stage: str = None, industry: Optional[str] = None) -> Dict:
-        """Add estimated metrics when none found, based on stage and industry"""
-        print(f"Estimation called - Stage: {stage}, Industry: {industry}, Current metrics: {metrics}")
-        
-        # Only add estimates if no revenue was extracted
+        """
+        DO NOT hallucinate metrics. If revenue/growth not found in the document,
+        mark them as explicitly unavailable so Claude doesn't get fake numbers.
+        """
+        print(f"Metrics check — Stage: {stage}, Industry: {industry}, Extracted: {metrics}")
+
+        # Only flag missing — never invent numbers
         if not metrics.get('revenue') and not metrics.get('arr') and not metrics.get('mrr'):
-            # Default estimates based on stage
-            stage_lower = (stage or '').lower()
-            print(f"Adding estimates for stage: {stage_lower}")
-            
-            if 'seed' in stage_lower or 'pre-seed' in stage_lower:
-                metrics['revenue'] = '$500K'  # Seed stage typically $100K-$1M
-                metrics['growth'] = '100%'
-            elif 'series a' in stage_lower or 'seriesa' in stage_lower:
-                metrics['revenue'] = '$2M'  # Series A typically $1M-$5M
-                metrics['growth'] = '80%'
-            elif 'series b' in stage_lower or 'seriesb' in stage_lower:
-                metrics['revenue'] = '$10M'  # Series B typically $5M-$20M
-                metrics['growth'] = '60%'
-            elif 'series c' in stage_lower or 'seriesc' in stage_lower:
-                metrics['revenue'] = '$25M'  # Series C typically $20M-$50M
-                metrics['growth'] = '40%'
-            elif 'growth' in stage_lower:
-                metrics['revenue'] = '$5M'  # Growth stage typically $2M-$10M
-                metrics['growth'] = '70%'
-            else:
-                # Default/unknown stage - use conservative estimate
-                metrics['revenue'] = '$1M'
-                metrics['growth'] = '50%'
-                metrics['_estimated'] = True  # Mark as estimated
-        
-        # Add estimated growth rate if not found but revenue exists
-        if not metrics.get('growth') and not metrics.get('growth_rate') and metrics.get('revenue'):
-            metrics['growth'] = '50%'  # Default growth estimate
-            metrics['_estimated'] = True
-        
+            metrics['revenue'] = 'Not found in document'
+            metrics['_no_revenue'] = True
+
+        if not metrics.get('growth') and not metrics.get('growth_rate'):
+            metrics['growth'] = 'Not found in document'
+            metrics['_no_growth'] = True
+
         return metrics
     
     def _extract_founders(self, text: str) -> List[str]:
         """Extract founder names from pitch deck"""
         founders = []
+        if not text:  # ← guard
+            return founders
         text_lower = text.lower()
         
         # Look for founder sections
@@ -569,6 +524,8 @@ class PitchDeckService:
     
     def _extract_team_size(self, text: str) -> Optional[int]:
         """Extract team size from pitch deck"""
+        if not text:  # ← guard
+            return None
         patterns = [
             r'(\d+)\s*(?:person|people|employee|team)\s*(?:team)?',
             r'team\s*(?:of\s*)?(\d+)',
@@ -586,31 +543,32 @@ class PitchDeckService:
     
     def _extract_industry(self, text: str) -> str:
         """Extract industry from text"""
+        if not text:
+            return None
         text_lower = text.lower()
-        
-        # Industry patterns
-        industry_patterns = {
-            'fintech': ['fintech', 'financial technology', 'payments', 'banking', 'finance'],
-            'healthcare': ['healthcare', 'health', 'medical', 'pharma', 'biotech'],
-            'saas': ['saas', 'software as a service', 'software', 'platform'],
-            'ecommerce': ['ecommerce', 'e-commerce', 'retail', 'marketplace', 'shopping'],
-            'ai/ml': ['artificial intelligence', 'machine learning', 'ai', 'ml', 'deep learning', 'ai co-pilot', 'vertical ai'],
-            'edtech': ['edtech', 'education', 'learning', 'teaching', 'online education'],
-            'fintech': ['fintech', 'financial technology', 'payments', 'banking'],
-            'agritech': ['agritech', 'agriculture', 'farming', 'agri'],
-            'mobility': ['mobility', 'transportation', 'logistics', 'delivery', 'electric vehicle', 'ev'],
-            'b2b': ['b2b', 'business to business'],
-            'consumer': ['b2c', 'consumer', 'direct to consumer'],
-            'manufacturing': ['manufacturing', 'factory', 'production'],
-            'energy': ['energy', 'renewable', 'solar', 'wind', 'clean energy'],
-            'hr tech': ['hr', 'hiring', 'recruiting', 'recruitment', 'talent', 'workforce', 'human resources'],
-        }
-        
-        for industry, keywords in industry_patterns.items():
+
+        # Order matters — more specific first. No duplicate keys.
+        industry_patterns = [
+            ('mobility',     ['electric vehicle', 'ev rental', 'bike rental', 'scooter', 'last-mile', 'fleet', 'mobility', 'bijliride', 'transportation', 'logistics', 'delivery']),
+            ('agritech',     ['agritech', 'agriculture', 'farming', 'agri', 'crop', 'soil']),
+            ('edtech',       ['edtech', 'education', 'learning', 'teaching', 'online education', 'e-learning']),
+            ('healthcare',   ['healthcare', 'health', 'medical', 'pharma', 'biotech', 'clinical', 'patient']),
+            ('energy',       ['energy', 'renewable', 'solar', 'wind', 'clean energy', 'battery']),
+            ('fintech',      ['fintech', 'financial technology', 'payments', 'banking', 'neobank', 'lending']),
+            ('hr tech',      ['hr tech', 'hiring', 'recruiting', 'recruitment', 'talent', 'workforce', 'human resources']),
+            ('ecommerce',    ['ecommerce', 'e-commerce', 'retail', 'marketplace', 'shopping', 'd2c']),
+            ('ai/ml',        ['artificial intelligence', 'machine learning', 'deep learning', 'ai co-pilot', 'vertical ai', 'generative ai']),
+            ('manufacturing', ['manufacturing', 'factory', 'production', 'assembly', 'industrial']),
+            ('b2b',          ['b2b', 'business to business', 'enterprise software']),
+            ('consumer',     ['b2c', 'consumer', 'direct to consumer']),
+            ('saas',         ['saas', 'software as a service', 'subscription', 'recurring revenue', 'platform']),
+        ]
+
+        for industry, keywords in industry_patterns:
             for keyword in keywords:
                 if keyword in text_lower:
                     return industry
-        
+
         return None
     
     def _extract_funding_stage(self, text: str) -> Optional[str]:
@@ -655,6 +613,8 @@ class PitchDeckService:
     
     def _extract_company_name(self, text: str, file_name: str = "") -> str:
         """Extract company name from pitch deck text and filename"""
+        if not text:  # ← guard: can't extract from None
+            text = ""
         text_lower = text.lower()
         
         # Try to extract from filename first (often most reliable)
@@ -744,6 +704,8 @@ class PitchDeckService:
     
     def _generate_summary(self, text: str, metrics: Dict) -> str:
         """Generate a brief summary of the pitch deck"""
+        if not text:  # ← guard
+            text = ""
         # Get first few sentences
         sentences = text.split('.')[:3]
         summary = '. '.join(s.strip() for s in sentences if len(s.strip()) > 20)

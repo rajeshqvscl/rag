@@ -49,6 +49,11 @@ def call_claude_with_retry(messages, max_tokens=300, max_retries=6, retry_delay=
     return None
 
 def structure_text(text: str):
+    # ← guard: ensure text is never None before building prompt
+    text = text or ""
+    if not text.strip():
+        return {"type": "unknown", "section": "general", "content": ""}
+
     prompt = f"""
     Extract structured information from this text.
 
@@ -266,7 +271,11 @@ def structure_text(text: str):
 
 def analyze_documents(docs_context: list[str]):
     """Summarizes and analyzes multiple documents for a cohesive overview."""
-    combined_text = "\n\n--- DOCUMENT BORDER ---\n\n".join(docs_context)
+    # ← guard: ensure chunks are non-None strings before joining
+    safe_docs = [d or "" for d in docs_context if d is not None]
+    combined_text = "\n\n--- DOCUMENT BORDER ---\n\n".join(safe_docs)
+    if not combined_text.strip():
+        return {"analysis_markdown": "No document content to analyse.", "revenue_data": []}
     
     prompt = f"""
     You are an expert venture capital analyst. Analyze the following documents (pitch deck, financial models, etc.) for a startup.
@@ -365,85 +374,66 @@ def analyze_pitch_deck_detailed(extracted_text: str, company_name: str, key_metr
     Performs detailed VC-style analysis of a pitch deck with comprehensive sections.
     Returns structured analysis with Executive Summary, Strengths, Risks, Financials, and Recommendation.
     """
+    # ← guard all inputs before building prompt
+    extracted_text = extracted_text or ""
+    company_name = company_name or "Unknown Company"
     metrics_str = json.dumps(key_metrics, indent=2) if key_metrics else "No metrics available"
     
-    prompt = f"""You are a senior venture capital analyst at a top-tier VC firm. Perform a comprehensive analysis of the following pitch deck for {company_name}.
+    prompt = f"""You are a senior venture capital analyst. Analyse this pitch deck with strict data discipline.
 
-EXTRACTED PITCH DECK CONTENT:
+CRITICAL RULES — follow without exception:
+1. ONLY use data explicitly present in the extracted text below.
+2. If a metric shows "Not found in document" or is missing — state "Not available" for that field. Do NOT invent or estimate.
+3. If the extraction appears incomplete, say "⚠ Extraction incomplete — limited data available" at the top.
+4. Contradictory numbers must be flagged: write "DATA CONFLICT: [explain]".
+5. Never use phrases like "likely", "appears to be", "suggests" for factual metrics — only for qualitative observations.
+
+EXTRACTED PITCH DECK TEXT ({len(extracted_text)} characters from {len(extracted_text.split(chr(10)))} lines):
 {extracted_text[:12000]}
 
-EXTRACTED METRICS:
+EXTRACTED METRICS (from regex parsing — NOT AI-generated):
 {metrics_str}
 
-Provide a detailed investment analysis in the following format:
+Produce this exact structure:
 
 ## Executive Summary
-Provide a compelling 2-3 paragraph overview of the business, including:
-- What the company does (value proposition)
-- Target market and problem being solved
-- Current traction and key achievements
-- Funding stage and capital requirements
+2–3 sentences: company name, sector, stage, core value proposition. Cite one specific data point from the text.
 
-## Key Metrics
-List all quantitative metrics found or implied:
-- Revenue (current, growth rate)
-- Users/Customers
-- Fleet size, transaction volume, or other operational metrics
-- Retention rates, occupancy rates
-- Market size (TAM/SAM/SOM if available)
+## Key Metrics (Extracted Only)
+For each metric below, write the exact value from the text or "Not available":
+- Revenue: [value or Not available]
+- ARR/MRR: [value or Not available]
+- Growth Rate: [value or Not available]
+- Users/Customers: [value or Not available]
+- TAM: [value or Not available]
+- Funding Sought: [value or Not available]
+- Runway: [value or Not available]
 
 ## Key Strengths
-Identify 4-6 major competitive advantages:
-1. **Market Positioning** - Unique market opportunity, timing, differentiation
-2. **Value Proposition** - Product/service advantages, innovation
-3. **Operational Metrics** - Strong unit economics, retention, efficiency
-4. **Strategic Partnerships** - Key customers, distribution partners, investors
-5. **Team Quality** - Founder background, relevant experience, domain expertise
-6. **Traction** - Growth rate, customer validation, revenue milestones
+List 3–5 specific strengths supported by evidence from the text. Quote or reference specific lines.
 
 ## Key Risks & Concerns
-Identify 4-6 major risk factors:
-1. **Business Model Risks** - Capital intensity, scalability challenges, unit economics concerns
-2. **Market Risks** - Competition, market timing, adoption barriers
-3. **Execution Risks** - Team gaps, geographic expansion challenges, operational complexity
-4. **Financial Risks** - Burn rate, runway, capital efficiency, unclear path to profitability
-5. **Technology/Platform Risks** - Technical debt, infrastructure dependencies
-6. **Regulatory/Compliance Risks** - Industry regulations, policy changes
+List 3–5 risks. Be specific — reference what is missing or concerning from the actual data.
 
 ## Financial Highlights
-### Current Performance
-- Revenue metrics (MRR, ARR, monthly revenue)
-- Growth trajectory (YoY, MoM)
-- Key operational metrics
+### Revenue & Growth
+Only real numbers from the text. If none: "Insufficient financial data extracted."
 
-### Growth Projections
-- Revenue forecasts for next 3-5 years
-- Market expansion plans
-- Customer/user acquisition targets
-
-### Fund Utilization
-- Breakdown of how raised capital will be used
-- Major expense categories
-
-### Unit Economics
-- CAC, LTV, payback period (if available)
-- Margins and profitability indicators
-- Path to unit profitability
+### Capital Deployment
+Only if mentioned in the text. If not: "Not specified in pitch deck."
 
 ## Investment Recommendation
-Provide a clear stance:
-- **STRONG INTEREST / CONSIDER / PASS / PROCEED WITH CAUTION**
+**STANCE: [STRONG INTEREST / CONSIDER / PASS / PROCEED WITH CAUTION]**
 
-Include 3-5 specific due diligence priorities:
-1. Key questions to validate
-2. Areas requiring deeper investigation
-3. Critical assumptions to test
+Justify with 2–3 specific data points from the text.
 
-Conclude with overall investment thesis in 2-3 sentences.
+Due Diligence Priorities:
+1. [Specific question based on gaps in the data]
+2. [Specific question based on gaps in the data]
+3. [Specific question based on gaps in the data]
 
 ---
-Format the output as clean markdown with proper headers (##), bold key terms (**), and bullet points.
-Be specific, use data from the pitch deck where available, and provide actionable insights."""
+Output clean markdown only. No preamble. If data is genuinely insufficient, say so clearly rather than padding with generic investor language."""
 
     try:
         response = call_claude_with_retry([{"role": "user", "content": prompt}], max_tokens=2500)
@@ -527,49 +517,65 @@ def extract_revenue_from_analysis(analysis_text: str) -> list:
     return sorted(unique_data, key=lambda x: x['year'])
 
 def generate_draft_email(analysis_summary: str, company: str, revenue_data: list = None):
-    """Generates a professional email draft based on the document analysis and financial projections."""
-    
+    """Generates a grounded investor outreach email based only on real extracted data."""
+    # ← guard both inputs
+    analysis_summary = analysis_summary or "No analysis available"
+    company = company or "Unknown Company"
+
     proj_str = ""
     if revenue_data:
-        proj_str = "\nExtracted Projections:\n" + "\n".join([f"- {r.get('year')}: {r.get('revenue')}" for r in revenue_data])
+        proj_str = "\nRevenue trajectory extracted from deck:\n" + "\n".join(
+            [f"- {r.get('year', 'N/A')}: {r.get('revenue', 'N/A')}" for r in revenue_data]
+        )
 
-    prompt = f"""
-    Based on the following analysis of {company}'s pitch deck and documents, draft a professional and detailed email response.
-    The email should:
-    - Thank them for the revert and the materials.
-    - Mention specific financial highlights or projections (especially those listed below).
-    - Show we've deep-dived into their revenue numbers and growth trajectory.
-    - Ask 2-3 specific clarifying questions based on the risks or gaps identified.
-    - Propose a follow-up call if the analysis is positive.
-    - Maintain a professional, interested, yet critical venture capital tone.
+    prompt = f"""You are a venture capitalist writing a concise, data-grounded outreach email.
 
-    Analysis context:
-    {analysis_summary}
+STRICT RULES:
+1. Use ONLY the data in the Analysis Context below. Do NOT invent metrics.
+2. If a metric says "Not available" or "Not found in document" — do not mention it.
+3. Reference AT LEAST 2 specific data points that actually appear in the context.
+4. Mention 1 risk or open question that needs clarification.
+5. BANNED phrases: "intrigued by your vision", "impressive journey", "exciting opportunity", "look forward to connecting", "game-changing". Replace with specific observations.
+6. Length: 150–200 words max. No fluff.
 
-    {proj_str}
-    """
+Analysis Context for {company}:
+{analysis_summary[:3000]}
+{proj_str}
+
+Write the email in this exact structure:
+
+Subject: [Specific to their sector/product — not generic]
+
+Hi [Company] Team,
+
+[Opening sentence: cite ONE specific fact from the analysis — e.g., revenue, market size, stage, product detail]
+
+[2–3 sentences: reference specific data points — what stands out, what needs clarification]
+
+[One direct ask: 30-min call, specific question, or next step]
+
+Best,
+[Your Name]
+[Title] | [Firm]
+
+IMPORTANT: If no useful data is available from the analysis, write a brief honest note saying the pitch deck lacked sufficient detail and request a revised deck with key metrics before scheduling a call."""
 
     try:
-        response = call_claude_with_retry([{"role": "user", "content": prompt}], max_tokens=1000)
+        response = call_claude_with_retry([{"role": "user", "content": prompt}], max_tokens=600)
         return response.content[0].text
     except Exception as e:
         print(f"Claude API error in generate_draft_email: {e}")
-        # Fallback email draft
-        return f"""Subject: Document Review - {company}
+        # Grounded fallback — honest about missing data
+        return f"""Subject: {company} — Pitch Deck Review
 
-Dear Team,
+Hi {company} Team,
 
-We have received and processed the documents for {company}. Due to current API service limitations, we recommend manual review of the materials.
+We have reviewed the materials you shared. Before scheduling a call, we'd like to understand your current revenue, growth trajectory, and use of funds in more detail — the pitch deck provided limited financial data.
 
-The system has successfully:
-- Extracted document content
-- Performed basic financial analysis
-- Identified key metrics and indicators
-
-Please review the analysis summary and follow up as needed.
+Could you share an updated deck or a one-pager with your key metrics (ARR/MRR, growth rate, burn rate, runway)?
 
 Best regards,
-FinRAG System"""
+[Your Name] | [Firm]"""
 
 # Lazy client proxy for import compatibility
 class _ClientProxy:

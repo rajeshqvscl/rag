@@ -684,8 +684,8 @@ searchInput.onkeypress = async (e) => {
                 headers: { 'X-API-KEY': 'finrag_at_2026' }
             });
             const data = await response.json();
+            showSection('analysis');
             renderIntel(data);
-            showSection('intel');
         } catch (err) {
             console.error(err);
         } finally {
@@ -695,7 +695,9 @@ searchInput.onkeypress = async (e) => {
 };
 
 function renderIntel(data) {
-    const resultsContainer = document.getElementById('search-results');
+    // Render into the existing analysis panel
+    const resultsContainer = document.getElementById('analysis-markdown');
+    if (!resultsContainer) return;
     
     let html = `
         <div style="background: rgba(99, 102, 241, 0.1); padding:1.5rem; border-radius:12px; margin-bottom:2rem; border-left:4px solid var(--primary);">
@@ -705,7 +707,7 @@ function renderIntel(data) {
     `;
 
     if (data.projections && data.projections.length > 0) {
-        html += `<h4>Financial Memory Found</h4><div style="display:flex; gap:1rem; margin:1rem 0;">`;
+        html += `<h4>Financial Memory Found</h4><div style="display:flex; gap:1rem; margin:1rem 0; flex-wrap:wrap;">`;
         data.projections.forEach(p => {
             html += `<div class="card" style="padding:1rem; border:1px solid #333;">
                 <div style="font-size:0.8rem; color:var(--text-muted);">${p.period}</div>
@@ -716,17 +718,19 @@ function renderIntel(data) {
         html += `</div>`;
     }
 
-    html += `<h4>Corpus Search Results</h4><div style="margin-top:1rem;">`;
-    data.results.forEach(res => {
-        html += `
-            <div style="margin-bottom:1.5rem; border-bottom:1px solid #222; padding-bottom:1rem;">
-                <div style="color:var(--secondary); font-size:0.8rem; font-weight:bold;">Source: ${res.type}</div>
-                <div style="font-size:0.9rem; color:var(--text-muted);">${res.text.substring(0, 300)}...</div>
-            </div>
-        `;
-    });
-    html += `</div>`;
-    
+    if (data.results && data.results.length > 0) {
+        html += `<h4>Corpus Search Results</h4><div style="margin-top:1rem;">`;
+        data.results.forEach(res => {
+            html += `
+                <div style="margin-bottom:1.5rem; border-bottom:1px solid #222; padding-bottom:1rem;">
+                    <div style="color:var(--secondary); font-size:0.8rem; font-weight:bold;">Source: ${res.type}</div>
+                    <div style="font-size:0.9rem; color:var(--text-muted);">${res.text.substring(0, 300)}...</div>
+                </div>
+            `;
+        });
+        html += `</div>`;
+    }
+
     resultsContainer.innerHTML = html;
 }
 
@@ -986,7 +990,7 @@ async function loadDrafts() {
             }
             
             draftsList.innerHTML = html;
-            console.log('Successfully rendered ' + data.drafts.length + ' drafts');
+            console.log('Successfully rendered ' + drafts.length + ' drafts');
             
             // Attach event listeners to buttons
             draftsList.querySelectorAll('.view-analysis-btn').forEach(btn => {

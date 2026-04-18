@@ -50,7 +50,7 @@ class RAGService:
 
         # Lazy load - don't load index on startup to save memory
         # Index will be loaded on first use
-        
+
     def _create_index(self):
         """Create appropriate FAISS index based on configuration"""
         if self.use_hnsw:
@@ -79,23 +79,6 @@ class RAGService:
                 model = SentenceTransformer(self.model_name)
                 self.model = model
 
-class VoyageEmbeddingModel:
-    """Wrapper to make VoyageAI compatible with existing RAG service interface"""
-    def __init__(self, embed_texts_func, embed_query_func):
-        self.embed_texts = embed_texts_func
-        self.embed_query = embed_query_func
-    
-    def encode(self, texts):
-        """Encode single text or list of texts - compatible with sentence-transformers API"""
-        if isinstance(texts, str):
-            # Single text
-            return self.embed_query(texts)
-        elif isinstance(texts, list):
-            # List of texts
-            return self.embed_texts(texts)
-        else:
-            raise ValueError("Expected string or list of strings")
-
     def load(self):
         """Load existing index or create new one"""
         if os.path.exists(self.index_path) and os.path.exists(self.meta_path):
@@ -104,13 +87,13 @@ class VoyageEmbeddingModel:
                 with open(self.meta_path, "rb") as f:
                     self.metadata = pickle.load(f)
                 print(f"Loaded index with {len(self.metadata)} documents")
-                
+
                 # Check if loaded index type matches configuration
                 is_hnsw_loaded = hasattr(self.index, 'hnsw') or \
                                 (hasattr(self.index, 'index') and hasattr(self.index.index, 'hnsw'))
                 if self.use_hnsw != is_hnsw_loaded:
                     print(f"Warning: Loaded index type differs from configuration (use_hnsw={self.use_hnsw})")
-                    
+
             except Exception as e:
                 print(f"Failed to load FAISS index: {e}. Creating new index.")
                 self.index = self._create_index()
@@ -128,14 +111,16 @@ class VoyageEmbeddingModel:
     def add_documents(self, docs):
         """Add documents to the index"""
         self._load_model()
+        if self.index is None:
+            self.load()
         texts = [doc["text"] for doc in docs]
         embeddings = self.model.encode(texts)
-        
+
         # Convert to float32 for FAISS
         if not isinstance(embeddings, np.ndarray):
             embeddings = np.array(embeddings)
         embeddings = embeddings.astype('float32')
-        
+
         # Simple add works for both HNSW and Flat indices
         # FAISS maintains internal sequential IDs that match our metadata list
         self.index.add(embeddings)
@@ -146,25 +131,27 @@ class VoyageEmbeddingModel:
     def query(self, query_text, k=5, symbol=None):
         """Query the index with vector search + optional keyword fallback"""
         self._load_model()
-        
+        if self.index is None:
+            self.load()
+
         if len(self.metadata) == 0:
             return []
-        
+
         # 1. Vector Search
         query_embedding = self.model.encode([query_text])
-        
+
         # Convert to float32
         if not isinstance(query_embedding, np.ndarray):
             query_embedding = np.array(query_embedding)
         query_embedding = query_embedding.astype('float32')
-        
+
         # Search with over-fetching for filtering
         search_k = min(k * 3, len(self.metadata))  # Get more candidates for filtering
         D, I = self.index.search(query_embedding, search_k)
 
         results = []
         seen_texts = set()
-        
+
         for i, idx in enumerate(I[0]):
             if idx == -1:  # FAISS returns -1 for empty slots
                 continue
@@ -191,13 +178,12 @@ class VoyageEmbeddingModel:
                         m_copy['score'] = 0.5  # Lower score for keyword matches
                         keyword_results.append(m_copy)
                         seen_texts.add(m['text'])
-            
+
             results.extend(keyword_results)
-        
+
         # Sort by score and return top k
         results.sort(key=lambda x: x.get('score', 0), reverse=True)
         return results[:k]
-
 
     def get_stats(self):
         """Get index statistics"""
@@ -207,7 +193,10 @@ class VoyageEmbeddingModel:
             "vector_dimension": self.vector_dim,
             "model_name": self.model_name
         }
-        
+
+        if self.index is None:
+            return stats
+
         if self.use_hnsw and hasattr(self.index, 'hnsw'):
             stats["hnsw_m"] = self.hnsw_m
             stats["hnsw_ef_construction"] = self.hnsw_ef_construction
@@ -219,23 +208,25 @@ class VoyageEmbeddingModel:
             stats["hnsw_ef_construction"] = self.hnsw_ef_construction
             stats["hnsw_ef_search"] = self.hnsw_ef_search
             stats["hnsw_levels"] = inner.hnsw.max_level if hasattr(inner.hnsw, 'max_level') else None
-            
+
         return stats
-    
+
     def benchmark_query(self, query_text="financial analysis report", k=5, iterations=100):
         """Benchmark query performance"""
         import time
-        
+
         if len(self.metadata) == 0:
             return {"error": "No documents in index"}
-        
+
         self._load_model()
+        if self.index is None:
+            self.load()
         query_embedding = self.model.encode([query_text]).astype('float32')
-        
+
         # Warmup
         for _ in range(5):
             self.index.search(query_embedding, k)
-        
+
         # Benchmark
         times = []
         for _ in range(iterations):
@@ -243,11 +234,11 @@ class VoyageEmbeddingModel:
             self.index.search(query_embedding, k)
             end = time.perf_counter()
             times.append((end - start) * 1000)  # Convert to ms
-        
+
         avg_time = sum(times) / len(times)
         min_time = min(times)
         max_time = max(times)
-        
+
         return {
             "index_type": "HNSW" if self.use_hnsw else "Flat",
             "total_docs": len(self.metadata),
@@ -258,7 +249,7 @@ class VoyageEmbeddingModel:
             "max_ms": round(max_time, 3),
             "queries_per_second": round(1000 / avg_time, 1)
         }
-    
+
     def rebuild_index(self, use_hnsw=None, hnsw_m=None, hnsw_ef_construction=None):
         """Rebuild index with new configuration"""
         if use_hnsw is not None:
@@ -267,16 +258,16 @@ class VoyageEmbeddingModel:
             self.hnsw_m = hnsw_m
         if hnsw_ef_construction is not None:
             self.hnsw_ef_construction = hnsw_ef_construction
-            
+
         print(f"Rebuilding index with HNSW={self.use_hnsw}")
-        
+
         # Save old data
         old_metadata = self.metadata.copy()
-        
+
         # Create new index
         self.metadata = []
         self.index = self._create_index()
-        
+
         # Re-add all documents
         if old_metadata:
             batch_size = 100
@@ -284,10 +275,28 @@ class VoyageEmbeddingModel:
                 batch = old_metadata[i:i+batch_size]
                 self.add_documents(batch)
                 print(f"Re-added {min(i+batch_size, len(old_metadata))}/{len(old_metadata)} documents")
-        
+
         self.save()
         print(f"Index rebuilt with {len(self.metadata)} documents")
         return self.get_stats()
+
+
+class VoyageEmbeddingModel:
+    """Wrapper to make VoyageAI compatible with existing RAG service interface"""
+    def __init__(self, embed_texts_func, embed_query_func):
+        self.embed_texts = embed_texts_func
+        self.embed_query = embed_query_func
+
+    def encode(self, texts):
+        """Encode single text or list of texts - compatible with sentence-transformers API"""
+        if isinstance(texts, str):
+            # Single text
+            return self.embed_query(texts)
+        elif isinstance(texts, list):
+            # List of texts
+            return self.embed_texts(texts)
+        else:
+            raise ValueError("Expected string or list of strings")
 
 
 # Create global instance with HNSW enabled

@@ -31,9 +31,9 @@ def get_or_create_default_user(db: Session):
 def generate_fallback_analysis(company_name: str, extracted: Dict, key_metrics: Dict, revenue_trajectory: list, text_content: str) -> str:
     """Generate detailed VC-style analysis using extracted data when Claude API is unavailable."""
     
-    industry = extracted.get('industry', 'Technology')
-    stage = extracted.get('stage', 'Early Stage')
-    founders = extracted.get('founders', [])
+    industry = extracted.get('industry') or 'Technology'
+    stage = extracted.get('stage') or 'Early Stage'
+    founders = extracted.get('founders') or []
     team_size = extracted.get('team_size')
     pages = extracted.get('pages', 0)
     
@@ -62,15 +62,15 @@ def generate_fallback_analysis(company_name: str, extracted: Dict, key_metrics: 
     
     # Executive Summary
     sections.append(f"## Executive Summary\n\n")
-    # Clean up stage text (avoid "growth stage stage")
-    stage_clean = stage.lower().replace(' stage', '').replace('stage ', '')
+    # Clean up stage text (avoid "growth stage stage") — guard None
+    stage_clean = (stage or 'early').lower().replace(' stage', '').replace('stage ', '')
     sections.append(f"{company_name} is a {stage_clean} stage company operating in the {industry} sector. ")
     sections.append(f"Based on the pitch deck analysis, the company presents a venture capital opportunity ")
     sections.append(f"that requires further evaluation. The document contains {pages} pages of business information.\n\n")
     
     # Add industry-specific context only if it aligns with detected industry
-    industry_lower = industry.lower()
-    text_lower = text_content.lower()
+    industry_lower = (industry or '').lower()
+    text_lower = (text_content or '').lower()
     
     if ('electric' in text_lower or 'ev' in text_lower or 'vehicle' in text_lower) and 'mobility' in industry_lower:
         sections.append(f"The company operates in the electric vehicle / sustainable mobility space, ")
@@ -112,7 +112,7 @@ def generate_fallback_analysis(company_name: str, extracted: Dict, key_metrics: 
         strengths.append(f"**Strong Growth:** {growth} growth rate indicating rapid market expansion")
     if users or fleet_size:
         strengths.append(f"**User/Fleet Base:** Established operational base with active users/vehicles")
-    if 'partner' in text_content.lower() or 'client' in text_content.lower():
+    if 'partner' in text_lower or 'client' in text_lower:
         strengths.append(f"**Strategic Partnerships:** References to business partnerships and client relationships")
     if founders:
         strengths.append(f"**Experienced Team:** Founding team with industry background")
@@ -139,11 +139,11 @@ def generate_fallback_analysis(company_name: str, extracted: Dict, key_metrics: 
         risks.append(f"**Revenue Validation:** Limited financial data for investment decision")
     if runway == 'Not specified' or (runway and 'month' in runway.lower() and int(re.search(r'\d+', runway).group()) < 12):
         risks.append(f"**Runway Concerns:** Short cash runway requiring near-term funding")
-    if 'compet' in text_content.lower():
+    if 'compet' in text_lower:
         risks.append(f"**Competitive Market:** Competitive landscape may pressure margins")
-    if 'capital' in text_content.lower() or 'capex' in text_content.lower():
+    if 'capital' in text_lower or 'capex' in text_lower:
         risks.append(f"**Capital Intensity:** Business model requires significant capital deployment")
-    if 'regulat' in text_content.lower():
+    if 'regulat' in text_lower:
         risks.append(f"**Regulatory Risk:** Subject to potential regulatory changes")
     
     if risks:
@@ -401,8 +401,8 @@ async def upload_pitch_deck(
             print(f"Using filename-based company name: {company_name}")
         
         # Get extracted metrics
-        key_metrics = extracted.get('key_metrics', {})
-        text_content = extracted.get('text', '')
+        key_metrics = extracted.get('key_metrics') or {}
+        text_content = extracted.get('text') or ''  # ← guard
         
         # Extract revenue trajectory specifically for this pitch deck
         revenue_trajectory = pitch_deck_service._extract_revenue_from_text(text_content)
@@ -472,9 +472,9 @@ async def upload_pitch_deck(
                 # Use normalized text for financial chunks, regular text for others
                 chunk_texts = []
                 for c in sorted_chunks[:5]:  # Top 5 most relevant chunks
-                    text = c.get('normalized_text', c.get('text', ''))
+                    text = c.get('normalized_text') or c.get('text') or ''  # ← guard
                     if text:
-                        chunk_texts.append(text[:500])  # Limit length for embedding
+                        chunk_texts.append(text[:500])
                 
                 if chunk_texts:
                     embeddings = [get_embedding(chunk) for chunk in chunk_texts]
@@ -498,21 +498,32 @@ async def upload_pitch_deck(
         print(f"Generating detailed VC analysis for {company_name} using Claude Sonnet 4...")
         from app.services.claude_service import analyze_pitch_deck_detailed
         claude_result = analyze_pitch_deck_detailed(text_content, company_name, key_metrics)
-        analysis_markdown = claude_result.get('detailed_analysis', '')
+
+        # ← THE FIX: .get() returns None when key exists but value is None.
+        # Use `or` to guarantee a string regardless of what Claude returned.
+        analysis_markdown = claude_result.get('detailed_analysis') or ""
+
+        # If Claude API failed, use the rich local fallback
+        if not analysis_markdown.strip():
+            print(f"Claude returned empty/None analysis — using local fallback for {company_name}")
+            analysis_markdown = generate_fallback_analysis(
+                company_name, extracted, key_metrics, revenue_trajectory, text_content or ""
+            )
 
         # Add analysis metadata section (frontend handles main title)
         analysis_header = f"""**Analysis Metadata:**
 - **Company:** {company_name}
-- **Industry:** {extracted.get('industry', 'Technology')}
-- **Stage:** {extracted.get('stage', 'Early Stage')}
+- **Industry:** {extracted.get('industry') or 'Technology'}
+- **Stage:** {extracted.get('stage') or 'Early Stage'}
 - **Document Pages:** {extracted.get('pages', 0)}
 - **Analysis ID:** {unique_id}
-- **Analysis Method:** Claude Sonnet 4 (claude-sonnet-4-20250514) - AI-powered VC analysis
+- **Analysis Method:** {'Claude Sonnet 4 (AI-powered)' if claude_result.get('detailed_analysis') else 'Local Fallback (Pattern Analysis)'}
 
 ---
 
 """
-        
+
+        # ← safe: both sides are now guaranteed strings
         analysis_markdown = analysis_header + analysis_markdown
         
         # Generate Google Meet scheduling email with general questions

@@ -62,8 +62,8 @@ class PDFExtractor:
         # Handle rupee patterns
         text = re.sub(r'₹([\d,.]+)\s*(?:Cr|Crore)\b', replace_unit, text, flags=re.IGNORECASE)
         text = re.sub(r'₹([\d,.]+)\s*(?:L|Lakh)\b', replace_unit, text, flags=re.IGNORECASE)
-        # Handle standalone K/M/B after numbers
-        text = re.sub(r'([\d,.]+)\s*([KMB])\b', replace_unit, text, flags=re.IGNORECASE)
+        # Handle standalone K/M/B after numbers - use \b before number to avoid B2B -> B2000000000B
+        text = re.sub(r'\b([\d,.]+)\s*([KMB])\b', replace_unit, text, flags=re.IGNORECASE)
         
         return text
     
@@ -264,15 +264,15 @@ class PDFExtractor:
             return self._fallback_extraction(file_path)
     
     def _fallback_extraction(self, file_path: str) -> Tuple[str, List[TextChunk], Dict]:
-        """Fallback to PyPDF2 if PyMuPDF fails"""
-        import PyPDF2
+        """Fallback to pypdf if PyMuPDF fails"""
+        import pypdf
         
         full_text = ""
         chunks = []
         
         try:
             with open(file_path, 'rb') as file:
-                reader = PyPDF2.PdfReader(file)
+                reader = pypdf.PdfReader(file)
                 for page_num, page in enumerate(reader.pages, 1):
                     text = page.extract_text() or ""
                     if text.strip():

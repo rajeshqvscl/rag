@@ -65,6 +65,8 @@ class ProjectionService:
 
     def extract_projections(self, symbol: str, context: str):
         """Extracts financial projections from text context using Claude."""
+        # Limit context to avoid exceeding token limits
+        context_snippet = context[:10000]
         prompt = f"""
         Extract any financial projections (revenue, profit, growth, future targets, etc.) for {symbol} from the text below.
         
@@ -85,7 +87,7 @@ class ProjectionService:
         ONLY return the JSON.
 
         Text:
-        {context[:10000]}  # Limit context for prompt
+        {context_snippet}
         """
 
         response = client.messages.create(

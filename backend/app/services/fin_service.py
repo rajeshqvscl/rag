@@ -28,40 +28,14 @@ def chunk_text(text: str, max_len=500) -> List[str]:
 
 def fetch_moneycontrol(symbol: str) -> List[Dict]:
     try:
-# Moneycontrol US stocks - dynamic search
-        url = f"https://www.moneycontrol.com/stocks/marketstats/nse/index.php"  # Use general or search page, scrape AAPL/MSFT etc.
+        # Moneycontrol US stocks - dynamic search
+        url = f"https://www.moneycontrol.com/stocks/marketstats/nse/index.php"
         response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
         if not response.ok:
             return []
         soup = BeautifulSoup(response.text, 'html.parser')
-        # Simplified: look for AAPL mentions
         text = soup.get_text()[:2000]
         docs = [{"text": f"{symbol} Moneycontrol overview: {text}", "type": "moneycontrol", "symbol": symbol}]
-        return docs
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        docs = []
-        
-        # Example selectors (inspect site for exact)
-        title = soup.find('h1', class_='pc_lh25') or soup.title
-        company_name = title.text.strip() if title else 'Unknown'
-        
-        # Financial ratios/metrics
-        metrics = {}
-        metric_tables = soup.find_all('div', class_='greybox')
-        for table in metric_tables:
-            rows = table.find_all('tr')
-            for row in rows:
-                cols = row.find_all('td')
-                if len(cols) == 2:
-                    key = cols[0].text.strip()
-                    value = cols[1].text.strip()
-                    metrics[key] = value
-        
-        text = f"{symbol} from Moneycontrol: {company_name}. Key Metrics: {json.dumps(metrics, indent=2)[:1000]}..."
-        docs.append({"text": text, "type": "moneycontrol_metrics", "symbol": symbol})
-        
         return docs
     except Exception as e:
         print(f"Moneycontrol scrape error for {symbol}: {e}")
