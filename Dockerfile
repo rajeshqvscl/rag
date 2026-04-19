@@ -15,7 +15,6 @@ USER root
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
-    software-properties-common \
     libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
@@ -36,9 +35,6 @@ WORKDIR $HOME/app/backend
 # Create data directories with permissions
 RUN mkdir -p app/data/faiss_index app/data/library_files data/pitch_decks
 
-# Hugging Face runs on port 7860
-EXPOSE 7860
-
-# Professional Start Command for Railway (Linux)
+# Launch with Production Hardening
+# Railway will assign the PORT environment variable
 CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-9000}
-# Cloud Freshness Tag: 1776595500
