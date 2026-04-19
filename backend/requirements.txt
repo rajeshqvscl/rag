@@ -1,11 +1,12 @@
-# Cloud-Native RAG Architecture (Neon + PGVector)
+# Cloud-Native RAG Architecture (Final Stability Patch)
 fastapi
 uvicorn
 python-multipart
 python-dotenv
 httpx
 jinja2
-fastembed
+# Pinning fastembed for binary stability
+fastembed>=0.2.0
 faiss-cpu
 sqlalchemy
 psycopg2-binary
@@ -14,5 +15,6 @@ anthropic
 # PDF & Data Parsing
 pypdf
 tabulate
+# Standard Data tools
 pandas
 numpy
