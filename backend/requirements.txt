@@ -1,14 +1,13 @@
-# Professional AI Stability Architecture
+# Zero-RAM Cloud Architecture (Voyage AI + Neon)
 fastapi
 uvicorn
 python-multipart
 python-dotenv
 httpx
 jinja2
-# Industry Standard Embedding Engine (No Rust errors)
-sentence-transformers
+# Official Cloud AI Connector (0MB Local RAM usage)
+voyageai
 # Data & Vectors
-faiss-cpu
 sqlalchemy
 psycopg2-binary
 pgvector
