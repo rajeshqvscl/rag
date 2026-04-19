@@ -11,9 +11,12 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          lfs: true
-      - name: Push to hub
+      
+      - name: Install Hugging Face CLI
+        run: pip install huggingface_hub
+
+      - name: Deploy to Spaces (Pro Connector)
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git push --force https://:$HF_TOKEN@huggingface.co/spaces/msra134/finrag main
+          huggingface-cli upload msra134/finrag . . --repo-type=space --token=$HF_TOKEN
