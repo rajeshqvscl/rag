@@ -31,9 +31,19 @@ class RAGService:
             self.vector_dim = 1536
             self.model_name = "voyage-large-2"
 
-        self.index_path = "app/data/faiss_index/index.faiss"
-        self.meta_path = "app/data/faiss_index/meta.pkl"
-        os.makedirs(os.path.dirname(self.index_path), exist_ok=True)
+        # Unified Data Directory for Cloud Volumes (Railway/Local)
+        DATA_BASE_DIR = os.getenv("DATA_DIR", os.path.join(os.path.dirname(os.path.dirname(__file__)), "data"))
+        FAISS_INDEX_DIR = os.path.join(DATA_BASE_DIR, "faiss_index")
+        self.index_path = os.path.join(FAISS_INDEX_DIR, "index.faiss")
+        self.meta_path = os.path.join(FAISS_INDEX_DIR, "meta.pkl")
+        MODEL_CACHE_DIR = os.path.join(DATA_BASE_DIR, "models")
+
+        # Ensure directories exist
+        os.makedirs(FAISS_INDEX_DIR, exist_ok=True)
+        os.makedirs(MODEL_CACHE_DIR, exist_ok=True)
+
+        # Set FastEmbed cache directory globally
+        os.environ["FAST_EMBED_CACHE"] = MODEL_CACHE_DIR
 
     def _create_index(self):
         if self.use_hnsw:

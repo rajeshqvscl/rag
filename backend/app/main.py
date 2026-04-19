@@ -81,7 +81,11 @@ async def get_js():
 @app.get("/favicon.png")
 @app.get("/favicon.ico")
 async def get_favicon():
-    return FileResponse(os.path.join(FRONTEND_DIR, "favicon.png"))
+    # If favicon exists, return it; otherwise return a 204 No Content to avoid crashes
+    path = os.path.join(FRONTEND_DIR, "favicon.png")
+    if os.path.exists(path):
+        return FileResponse(path)
+    return ""  # Professional silent fallback
 
 # Mount remaining static assets (Images, etc)
 if os.path.exists(FRONTEND_DIR):
