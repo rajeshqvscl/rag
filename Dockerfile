@@ -39,5 +39,5 @@ RUN mkdir -p app/data/faiss_index app/data/library_files data/pitch_decks
 # Hugging Face runs on port 7860
 EXPOSE 7860
 
-# Launch with Production Hardening
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Professional Start Command for Railway (Linux)
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-9000}
