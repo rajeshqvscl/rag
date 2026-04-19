@@ -1,20 +1,19 @@
-# Cloud-Native RAG Architecture (Final Stability Patch)
+# Professional AI Stability Architecture
 fastapi
 uvicorn
 python-multipart
 python-dotenv
 httpx
 jinja2
-# Pinning fastembed for binary stability
-fastembed>=0.2.0
+# Industry Standard Embedding Engine (No Rust errors)
+sentence-transformers
+# Data & Vectors
 faiss-cpu
 sqlalchemy
 psycopg2-binary
 pgvector
 anthropic
-# PDF & Data Parsing
 pypdf
 tabulate
-# Standard Data tools
 pandas
 numpy

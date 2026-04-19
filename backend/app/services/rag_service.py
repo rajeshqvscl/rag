@@ -3,7 +3,7 @@ import json
 import numpy as np
 import psycopg2
 from pgvector.psycopg2 import register_vector
-from fastembed import TextEmbedding
+from sentence_transformers import SentenceTransformer
 
 class RAGService:
     def __init__(self):
@@ -33,22 +33,22 @@ class RAGService:
 
     def _lazy_load_model(self):
         if self.model is None:
-            print(f"🚀 [MEMORY] Loading Embedding Model: {self.model_name}")
-            self.model = TextEmbedding(model_name=self.model_name)
+            print(f"🚀 [MEMORY] Loading Stable AI Model: {self.model_name}")
+            self.model = SentenceTransformer(self.model_name)
 
     def add_documents(self, docs):
         self._ensure_table()
         self._lazy_load_model()
         
         texts = [doc["text"] for doc in docs]
-        embeddings = list(self.model.embed(texts))
+        embeddings = self.model.encode(texts)
         
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 for doc, embedding in zip(docs, embeddings):
                     cur.execute(
                         "INSERT INTO document_embeddings (text, metadata, embedding) VALUES (%s, %s, %s)",
-                        (doc["text"], json.dumps(doc.get("metadata", {})), embedding)
+                        (doc["text"], json.dumps(doc.get("metadata", {})), embedding.tolist())
                     )
                 conn.commit()
         print(f"✅ Synced {len(docs)} documents to Neon Cloud Vectors")
@@ -57,20 +57,18 @@ class RAGService:
         self._ensure_table()
         self._lazy_load_model()
         
-        query_embedding = list(self.model.embed([query_text]))[0]
+        query_embedding = self.model.encode([query_text])[0]
         
         with self._get_conn() as conn:
             with conn.cursor() as cur:
-                # Optimized cosine similarity search in DB
                 cur.execute(
                     "SELECT text, metadata FROM document_embeddings ORDER BY embedding <=> %s LIMIT %s",
-                    (query_embedding, k)
+                    (query_embedding.tolist(), k)
                 )
                 results = []
                 for text, metadata in cur.fetchall():
                     results.append({"text": text, **metadata})
                 return results
 
-    # Legacy methods mapping to new architecture
     def load(self): pass
     def save(self): pass
