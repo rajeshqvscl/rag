@@ -1,15 +1,18 @@
+# Professional RAG Architecture Dependencies
 fastapi
 uvicorn
+gunicorn
 python-multipart
 python-dotenv
+httpx
+jinja2
+fastembed
+faiss-cpu
 sqlalchemy
 psycopg2-binary
 anthropic
-sentence-transformers
-faiss-cpu
-numpy
-httpx
+# PDF & Data Parsing
 pypdf
-fastembed
-argon2-cffi
-jinja2
+tabulate
+pandas
+numpy

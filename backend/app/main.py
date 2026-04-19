@@ -92,4 +92,7 @@ if os.path.exists(FRONTEND_DIR):
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    import uvicorn
+    # Render uses $PORT, defaults to 10000
+    render_port = int(os.getenv("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=render_port)
