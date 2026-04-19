@@ -1,22 +1,32 @@
-# Professional FinRAG Ignore List
-__pycache__/
-*.py[cod]
-*$py.class
-backend/venv/
-.env
-backend/.env
+# --- RAG ARCHITECTURE LOCKDOWN ---
+# Database storage is now in Neon. 
+# Local files are permanently blocked.
 
-# Large Data Security (DO NOT PUSH TO CLOUD)
-backend/data/pitch_decks/*
-backend/data/library_files/*
-backend/data/faiss_index/*
-backend/sec_filings/*
-backend/logs/*
+*.pdf
+*.csv
+*.json
+*.faiss
+*.pkl
+*.npy
+*.db
+*.sqlite
 
-# OS Files
-.DS_Store
-Thumbs.db
-
-# Embedded Repos
-finrag/
+# Heavy Data Folders
+chroma/
+faiss_index/
+vector_db/
+data/
+storage/
 temp/
+backend/tmp/
+backend/app/data/
+
+# Python & Environment
+.venv/
+venv/
+__pycache__/
+.cache/
+.env
+.pytest_cache/
+.DS_Store
+*.log

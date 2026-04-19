@@ -1,7 +1,6 @@
-# Professional RAG Architecture Dependencies
+# Cloud-Native RAG Architecture (Neon + PGVector)
 fastapi
 uvicorn
-gunicorn
 python-multipart
 python-dotenv
 httpx
@@ -10,6 +9,7 @@ fastembed
 faiss-cpu
 sqlalchemy
 psycopg2-binary
+pgvector
 anthropic
 # PDF & Data Parsing
 pypdf
