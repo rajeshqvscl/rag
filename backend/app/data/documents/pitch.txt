@@ -1,0 +1,2 @@
+We are building an AI-powered financial analysis platform.
+Our revenue model is SaaS-based.

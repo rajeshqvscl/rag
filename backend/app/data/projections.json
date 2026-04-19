@@ -1,0 +1,682 @@
+{
+  "Pitchdeck (1)": [
+    {
+      "metric": "Revenue",
+      "value": "4710000",
+      "period": "Year 1",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "11030000",
+      "period": "Year 2",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "33100000",
+      "period": "Year 3",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "99300000",
+      "period": "Year 4",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "248200000",
+      "period": "Year 5",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "496500000",
+      "period": "Year 6",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "993080000",
+      "period": "Year 7",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1489600000",
+      "period": "Year 8",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "2234400000",
+      "period": "Year 9",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "3351660000",
+      "period": "Year 10",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "47100000",
+      "period": "Year 1",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "110300000",
+      "period": "Year 2",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "331000000",
+      "period": "Year 3",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "993000000",
+      "period": "Year 4",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "2482000000",
+      "period": "Year 5",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "4965000000",
+      "period": "Year 6",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "9930800000",
+      "period": "Year 7",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "14896000000",
+      "period": "Year 8",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "22344000000",
+      "period": "Year 9",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "33516600000",
+      "period": "Year 10",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "47100000",
+      "period": "Year 1",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "110300000",
+      "period": "Year 2",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "331000000",
+      "period": "Year 3",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "993000000",
+      "period": "Year 4",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "2482000000",
+      "period": "Year 5",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "4965000000",
+      "period": "Year 6",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "9930800000",
+      "period": "Year 7",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "14896000000",
+      "period": "Year 8",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "22344000000",
+      "period": "Year 9",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "33516600000",
+      "period": "Year 10",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "47100000",
+      "period": "Year 1",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "110300000",
+      "period": "Year 2",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "331000000",
+      "period": "Year 3",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "993000000",
+      "period": "Year 4",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "2482000000",
+      "period": "Year 5",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "4965000000",
+      "period": "Year 6",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "9930800000",
+      "period": "Year 7",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "14896000000",
+      "period": "Year 8",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "22344000000",
+      "period": "Year 9",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "33516600000",
+      "period": "Year 10",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "47100000",
+      "period": "Year 1 (Post-Funding)",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "110300000",
+      "period": "Year 2 (Post-Funding)",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "331000000",
+      "period": "Year 3 (Post-Funding)",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "993000000",
+      "period": "Year 4 (Post-Funding)",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "2482000000",
+      "period": "Year 5 (Post-Funding)",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "4965000000",
+      "period": "Year 6 (Post-Funding)",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "9930800000",
+      "period": "Year 7 (Post-Funding)",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "14896000000",
+      "period": "Year 8 (Post-Funding)",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "22344000000",
+      "period": "Year 9 (Post-Funding)",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "33516600000",
+      "period": "Year 10 (Post-Funding)",
+      "source_context": "Extracted from uploaded documents."
+    }
+  ],
+  "Bijliride Pitch Deck V4": [
+    {
+      "metric": "Revenue",
+      "value": "700000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1280000000",
+      "period": "2026",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "6720000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "280000000",
+      "period": "2024",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "700000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1280000000",
+      "period": "2026",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "6700000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "280000000",
+      "period": "2024",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "700000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1280000000",
+      "period": "2026",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "60000000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "280000000",
+      "period": "2024",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "700000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1280000000",
+      "period": "2026",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "60000000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "280000000",
+      "period": "2024",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "700000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1280000000",
+      "period": "2026",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "6700000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "280000000",
+      "period": "2024",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "700000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1280000000",
+      "period": "2026",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "60000000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "280000000",
+      "period": "2024",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "700000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1280000000",
+      "period": "2026",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "6700000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "280000000",
+      "period": "2024",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "700000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1280000000",
+      "period": "2026",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "67200000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "280000000",
+      "period": "2024",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "700000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1280000000",
+      "period": "2026",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "60000000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "280000000",
+      "period": "2024",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "700000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1280000000",
+      "period": "2026",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "60000000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "280000000",
+      "period": "2024",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "700000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1280000000",
+      "period": "2026",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "67200000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "280000000",
+      "period": "2024",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "700000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1280000000",
+      "period": "2026",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "67200000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "280000000",
+      "period": "2024",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "700000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1280000000",
+      "period": "2026",
+      "source_context": "Extracted from uploaded documents."
+    }
+  ],
+  "Pitchdeck": [
+    {
+      "metric": "Revenue",
+      "value": "4000000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "25000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "4000000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "20000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "4000000",
+      "period": "2023",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "20000000",
+      "period": "2025",
+      "source_context": "Extracted from uploaded documents."
+    }
+  ],
+  "LabBuddy Pitch Deck": [
+    {
+      "metric": "Revenue",
+      "value": "810000",
+      "period": "Sep-25",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1244000",
+      "period": "Oct-25",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1291000",
+      "period": "Nov-25",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1615000",
+      "period": "Dec-25",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "1802000",
+      "period": "Jan-26",
+      "source_context": "Extracted from uploaded documents."
+    },
+    {
+      "metric": "Revenue",
+      "value": "2174000",
+      "period": "Feb-26",
+      "source_context": "Extracted from uploaded documents."
+    }
+  ]
+}

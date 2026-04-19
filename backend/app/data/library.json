@@ -1,0 +1,26 @@
+[
+  {
+    "company": "Pitchdeck (1)",
+    "file_name": "Pitchdeck (1).pdf",
+    "file_path": "data/library_files\\Pitchdeck (1).pdf",
+    "date_uploaded": "2026-04-11 15:30:10",
+    "file_size": 3843717,
+    "confidence": "High"
+  },
+  {
+    "company": "Pitchdeck",
+    "file_name": "Pitchdeck.pdf",
+    "file_path": "data/library_files\\Pitchdeck.pdf",
+    "date_uploaded": "2026-04-11 15:44:38",
+    "file_size": 1297861,
+    "confidence": "High"
+  },
+  {
+    "company": "Bijliride Pitch Deck V4",
+    "file_name": "Bijliride Pitch Deck V4.pdf",
+    "file_path": "data/library_files\\Bijliride Pitch Deck V4.pdf",
+    "date_uploaded": "2026-04-11 17:49:16",
+    "file_size": 15324208,
+    "confidence": "High"
+  }
+]

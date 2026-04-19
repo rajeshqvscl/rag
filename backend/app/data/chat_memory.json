@@ -1,0 +1,44 @@
+{
+  "default": [
+    {
+      "role": "user",
+      "content": "What is Apple's revenue"
+    },
+    {
+      "role": "assistant",
+      "content": "Based on available data for AAPL, here are key insights:\n\nKey Findings:\n1. AAPL: Apple Inc.. Sector: Technology. Industry: Consumer Electronics. Market Cap: 3.2T. Apple Inc. designs, manufactures, and markets smartphones, per...\n2. AAPL Financial Data - Revenue 2023: 383.3B, Revenue 2022: 394.3B, Net Income 2023: 99.8B...\n3. AAPL Projection - Revenue Growth for 2024: 21% (Source: Industry analysis)...\n"
+    },
+    {
+      "role": "user",
+      "content": "What is Microsoft's market cap"
+    },
+    {
+      "role": "assistant",
+      "content": "Based on available data for MSFT, here are key insights:\n\nKey Findings:\n1. yfinance error for MSFT: Expecting value: line 1 column 1 (char 0)...\n2. MSFT - Data temporarily unavailable due to API rate limits. Please try again later....\n"
+    },
+    {
+      "role": "user",
+      "content": "Microsoft"
+    },
+    {
+      "role": "assistant",
+      "content": "Analysis temporarily unavailable due to API limitations. Found 5 relevant documents. Query: Microsoft"
+    },
+    {
+      "role": "user",
+      "content": "test"
+    },
+    {
+      "role": "assistant",
+      "content": "Analysis temporarily unavailable due to API limitations. Found 5 relevant documents. Query: test"
+    },
+    {
+      "role": "user",
+      "content": "Nvidia"
+    },
+    {
+      "role": "assistant",
+      "content": "Analysis temporarily unavailable due to API limitations. Found 5 relevant documents. Query: Nvidia"
+    }
+  ]
+}

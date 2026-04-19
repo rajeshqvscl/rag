@@ -1,0 +1,22 @@
+# Professional FinRAG Ignore List
+__pycache__/
+*.py[cod]
+*$py.class
+backend/venv/
+.env
+backend/.env
+
+# Large Data Security (DO NOT PUSH TO CLOUD)
+backend/data/pitch_decks/*
+backend/data/library_files/*
+backend/data/faiss_index/*
+backend/sec_filings/*
+backend/logs/*
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Embedded Repos
+finrag/
+temp/
