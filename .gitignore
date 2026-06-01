@@ -1,0 +1,16 @@
+cache/ 
+__pycache__/
+*.pyc
+.cache/
+.env
+
+# Ignore large data and indexes
+data/pdfs/
+data/faiss_index/
+vector_store/faiss_index/
+*.db
+*.pkl
+*.bin
+*.pdf
+embeddings/
+cache/

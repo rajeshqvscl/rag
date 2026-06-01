@@ -1,0 +1,33 @@
+fastapi
+uvicorn
+python-dotenv
+numpy
+pdfplumber
+groq
+pydantic
+pinecone
+requests
+pymupdf
+python-multipart
+PyPDF2
+sqlalchemy
+psycopg2-binary
+beautifulsoup4
+lxml
+google-generativeai
+
+rank-bm25
+pillow
+
+
+# Monitoring & Auth
+prometheus-client>=0.19.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Optional: Multi-modal support
+
+
+# Utilities
+httpx>=0.25.0
+orjson>=3.9.0

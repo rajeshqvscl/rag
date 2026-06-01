@@ -1,0 +1,41 @@
+[tool.poetry]
+name = "rag-system"
+version = "1.0.0"
+description = "RAG-based document analysis system"
+authors = []
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.12"
+fastapi = "*"
+uvicorn = "*"
+python-dotenv = "*"
+numpy = "*"
+pdfplumber = "*"
+groq = "*"
+pydantic = "*"
+pinecone = "*"
+requests = "*"
+pymupdf = "*"
+python-multipart = "*"
+PyPDF2 = "*"
+sqlalchemy = "*"
+psycopg2 = "*"
+beautifulsoup4 = "*"
+lxml = "*"
+google-generativeai = "*"
+camelot-py = "*"
+rank-bm25 = "*"
+pillow = "*"
+prometheus-client = ">=0.19.0"
+python-jose = {version = ">=3.3.0", extras = ["cryptography"]}
+passlib = {version = ">=1.7.4", extras = ["bcrypt"]}
+httpx = ">=0.25.0"
+orjson = ">=3.9.0"
+
+[tool.poetry.group.dev.dependencies]
+pytesseract = ">=0.3.10"
+pdf2image = ">=1.16.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
